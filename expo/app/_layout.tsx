@@ -8,6 +8,7 @@ import { StatusBar } from "expo-status-bar";
 import { authService, onAuthStateChange } from "../lib/auth";
 import { TimelineProvider } from "../context/TimelineContext";
 import { SettingsProvider } from "../context/SettingsContext";
+import "../lib/i18n"; // i18n'i başlat
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 

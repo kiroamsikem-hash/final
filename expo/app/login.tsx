@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Lock, User, Eye, EyeOff, Clock, Shield } from "lucide-react-native";
+import { useTranslation } from "react-i18next";
 import { loginUser, authService } from "../lib/auth";
 import { LinearGradient } from "expo-linear-gradient";
 import { toast, ToastContainer } from "../components/Toast";
@@ -22,6 +23,7 @@ const { width } = Dimensions.get("window");
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -29,11 +31,11 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
-      const msg = "Kullanıcı adı ve şifre gerekli!";
+      const msg = t("errors.required");
       if (Platform.OS === "web") {
         toast.error(msg);
       } else {
-        Alert.alert("Hata", msg);
+        Alert.alert(t("errors.generic"), msg);
       }
       return;
     }
@@ -45,7 +47,7 @@ export default function LoginScreen() {
       console.log("✅ Login successful, user:", user);
       
       if (Platform.OS === "web") {
-        toast.success("Giriş başarılı!");
+        toast.success(t("auth.loginSuccess"));
         // Small delay to show toast
         setTimeout(() => {
           window.location.href = "/";
@@ -56,11 +58,11 @@ export default function LoginScreen() {
       }
     } catch (error) {
       console.error("❌ Login error:", error);
-      const msg = (error as Error).message || "Giriş yapılırken hata oluştu!";
+      const msg = (error as Error).message || t("auth.loginError");
       if (Platform.OS === "web") {
         toast.error(msg);
       } else {
-        Alert.alert("Hata", msg);
+        Alert.alert(t("errors.generic"), msg);
       }
     } finally {
       setLoading(false);
@@ -93,7 +95,7 @@ export default function LoginScreen() {
                     </View>
                     <View style={styles.logoGlow} />
                   </View>
-                  <Text style={styles.title}>Western Anatolia</Text>
+                  <Text style={styles.title}>{t("timeline.title")}</Text>
                   <View style={styles.divider} />
                 </View>
 
@@ -102,12 +104,12 @@ export default function LoginScreen() {
                   <View style={styles.inputWrapper}>
                     <View style={styles.inputLabel}>
                       <User size={16} color="#c9a227" />
-                      <Text style={styles.labelText}>Kullanıcı Adı</Text>
+                      <Text style={styles.labelText}>{t("auth.username")}</Text>
                     </View>
                     <View style={styles.inputContainer}>
                       <TextInput
                         style={styles.input}
-                        placeholder="Kullanıcı adınızı girin"
+                        placeholder={t("auth.username")}
                         placeholderTextColor="#555"
                         value={username}
                         onChangeText={setUsername}
@@ -120,12 +122,12 @@ export default function LoginScreen() {
                   <View style={styles.inputWrapper}>
                     <View style={styles.inputLabel}>
                       <Lock size={16} color="#c9a227" />
-                      <Text style={styles.labelText}>Şifre</Text>
+                      <Text style={styles.labelText}>{t("auth.password")}</Text>
                     </View>
                     <View style={styles.inputContainer}>
                       <TextInput
                         style={styles.input}
-                        placeholder="Şifrenizi girin"
+                        placeholder={t("auth.password")}
                         placeholderTextColor="#555"
                         value={password}
                         onChangeText={setPassword}
@@ -160,7 +162,7 @@ export default function LoginScreen() {
                     >
                       <Shield size={20} color="#1a1a1a" />
                       <Text style={styles.loginButtonText}>
-                        {loading ? "Giriş Yapılıyor..." : "Giriş Yap"}
+                        {loading ? `${t("auth.login")}...` : t("auth.login")}
                       </Text>
                     </LinearGradient>
                   </TouchableOpacity>

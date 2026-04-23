@@ -60,10 +60,13 @@ npm install --legacy-peer-deps
 npx expo export:web
 ```
 
-#### 6. Serve Kur ve Başlat
+#### 6. Express Kur ve Başlat
 ```bash
-sudo npm install -g serve
-pm2 start "serve dist -s -l 3000" --name western-anatolia
+# Express'i kur
+npm install express --legacy-peer-deps
+
+# PM2 ile başlat
+pm2 start server.js --name western-anatolia
 pm2 startup
 pm2 save
 ```

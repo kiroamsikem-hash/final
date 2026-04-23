@@ -10,16 +10,26 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack } from "expo-router";
-import { ChevronLeft, RotateCcw, Save } from "lucide-react-native";
+import { ChevronLeft, RotateCcw, Save, Globe } from "lucide-react-native";
+import { useTranslation } from "react-i18next";
 
 import { useSettings } from "../context/SettingsContext";
 import { TimelineSettings } from "../types";
+import { saveLanguage } from "../lib/i18n";
+import { showToast } from "../components/Toast";
 
 // Unique identifier: wa-chron-settings-2024
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const YEAR_STEPS = [1, 5, 10, 25, 50, 100, 200, 500];
+
+const LANGUAGES = [
+  { code: "tr", name: "Türkçe", flag: "🇹🇷" },
+  { code: "en", name: "English", flag: "🇬🇧" },
+  { code: "fr", name: "Français", flag: "🇫🇷" },
+  { code: "de", name: "Deutsch", flag: "🇩🇪" },
+];
 
 const DATE_FORMATS: Array<{ value: TimelineSettings["dateFormat"]; label: string }> = [
   { value: "BC", label: "BC (Before Christ)" },
@@ -37,6 +47,18 @@ const RANGE_PRESETS = [
 export default function SettingsPage() {
   const router = useRouter();
   const { settings, updateSettings, resetSettings } = useSettings();
+  const { t, i18n } = useTranslation();
+
+  const changeLanguage = useCallback(
+    async (languageCode: string) => {
+      await i18n.changeLanguage(languageCode);
+      await saveLanguage(languageCode);
+      if (typeof window !== "undefined") {
+        showToast(t("settings.languageChanged"), "success");
+      }
+    },
+    [i18n, t]
+  );
 
   const applyRangePreset = useCallback(
     (preset: (typeof RANGE_PRESETS)[0]) => {
@@ -56,7 +78,7 @@ export default function SettingsPage() {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ChevronLeft size={28} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={styles.headerTitle}>{t("settings.title")}</Text>
         <TouchableOpacity style={styles.resetButton} onPress={resetSettings}>
           <RotateCcw size={20} color="#c9a227" />
         </TouchableOpacity>
@@ -67,8 +89,29 @@ export default function SettingsPage() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Language Selection */}
+        <Section title={t("settings.language")}>
+          <View style={styles.languageGrid}>
+            {LANGUAGES.map((lang) => {
+              const isActive = i18n.language === lang.code;
+              return (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={[styles.languageButton, isActive && styles.languageButtonActive]}
+                  onPress={() => changeLanguage(lang.code)}
+                >
+                  <Text style={styles.languageFlag}>{lang.flag}</Text>
+                  <Text style={[styles.languageText, isActive && styles.languageTextActive]}>
+                    {lang.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </Section>
+
         {/* Range Presets */}
-        <Section title="Year Range">
+        <Section title={t("settings.display")}>
           <View style={styles.presetGrid}>
             {RANGE_PRESETS.map((preset) => {
               const isActive =
@@ -129,39 +172,39 @@ export default function SettingsPage() {
         </Section>
 
         {/* Display Options */}
-        <Section title="Display">
+        <Section title={t("settings.display")}>
           <Toggle
-            label="Show Grid Lines"
+            label={t("settings.showGridLines") || "Show Grid Lines"}
             value={settings.showGridLines}
             onChange={(v) => updateSettings({ showGridLines: v })}
           />
           <Toggle
-            label="Show Year Labels"
+            label={t("settings.showYearLabels") || "Show Year Labels"}
             value={settings.showYearLabels}
             onChange={(v) => updateSettings({ showYearLabels: v })}
           />
           <Toggle
-            label="Show Photos"
+            label={t("settings.showPhotos") || "Show Photos"}
             value={settings.showPhotos}
             onChange={(v) => updateSettings({ showPhotos: v })}
           />
           <Toggle
-            label="Show Tags"
+            label={t("settings.showTags") || "Show Tags"}
             value={settings.showTags}
             onChange={(v) => updateSettings({ showTags: v })}
           />
           <Toggle
-            label="Highlight Centuries"
+            label={t("settings.highlightCenturies") || "Highlight Centuries"}
             value={settings.highlightCenturies}
             onChange={(v) => updateSettings({ highlightCenturies: v })}
           />
           <Toggle
-            label="Highlight Decades"
+            label={t("settings.highlightDecades") || "Highlight Decades"}
             value={settings.highlightDecades}
             onChange={(v) => updateSettings({ highlightDecades: v })}
           />
           <Toggle
-            label="Compact Mode"
+            label={t("settings.compactMode") || "Compact Mode"}
             value={settings.compactMode}
             onChange={(v) => updateSettings({ compactMode: v })}
           />
@@ -334,6 +377,38 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   presetTextActive: {
+    color: "#c9a227",
+    fontWeight: "600",
+  },
+  languageGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  languageButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#2a2a2a",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#3a3a3a",
+    gap: 8,
+  },
+  languageButtonActive: {
+    backgroundColor: "rgba(201, 162, 39, 0.2)",
+    borderColor: "#c9a227",
+  },
+  languageFlag: {
+    fontSize: 20,
+  },
+  languageText: {
+    color: "#aaa",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  languageTextActive: {
     color: "#c9a227",
     fontWeight: "600",
   },
