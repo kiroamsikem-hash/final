@@ -11,8 +11,8 @@ import {
   Alert,
   Platform,
 } from "react-native";
-import { X, Calendar, MapPin, Tag, Info, Clock, Edit2, Trash2, Check } from "lucide-react-native";
-import { Civilization, PeriodEvent } from "@/types";
+import { X, Calendar, MapPin, Tag, Info, Clock, Edit2, Trash2, Check, Palette } from "lucide-react-native";
+import { Civilization, PeriodEvent, CIVILIZATION_COLORS } from "@/types";
 
 interface InspectorPanelProps {
   visible: boolean;
@@ -43,6 +43,11 @@ export function InspectorPanel({
   const [editedName, setEditedName] = useState("");
   const [editedRegion, setEditedRegion] = useState("");
   const [editedDescription, setEditedDescription] = useState("");
+  const [editedStartYear, setEditedStartYear] = useState("");
+  const [editedEndYear, setEditedEndYear] = useState("");
+  const [editedColor, setEditedColor] = useState("");
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [customColor, setCustomColor] = useState("");
 
   // Reset edit mode when panel closes or civilization changes
   React.useEffect(() => {
@@ -71,6 +76,9 @@ export function InspectorPanel({
       setEditedName(selectedCivilization.name);
       setEditedRegion(selectedCivilization.region);
       setEditedDescription(selectedCivilization.description);
+      setEditedStartYear(Math.abs(selectedCivilization.startYear).toString());
+      setEditedEndYear(Math.abs(selectedCivilization.endYear).toString());
+      setEditedColor(selectedCivilization.color);
       setEditMode(true);
     }
   };
@@ -88,15 +96,43 @@ export function InspectorPanel({
       return;
     }
 
+    // Validate years
+    const startYear = parseInt(editedStartYear, 10);
+    const endYear = parseInt(editedEndYear, 10);
+    
+    if (isNaN(startYear) || isNaN(endYear)) {
+      const msg = "Geçerli yıl değerleri girin!";
+      if (Platform.OS === "web") {
+        if (typeof window !== "undefined") window.alert(msg);
+      } else {
+        Alert.alert("Hata", msg);
+      }
+      return;
+    }
+
+    if (startYear < endYear) {
+      const msg = "Başlangıç yılı bitiş yılından büyük olmalı (M.Ö. tarihleri için)!";
+      if (Platform.OS === "web") {
+        if (typeof window !== "undefined") window.alert(msg);
+      } else {
+        Alert.alert("Hata", msg);
+      }
+      return;
+    }
+
     const updated: Civilization = {
       ...selectedCivilization,
       name: editedName.trim(),
       region: editedRegion.trim(),
       description: editedDescription.trim(),
+      startYear: -Math.abs(startYear), // Convert to negative (BC)
+      endYear: -Math.abs(endYear), // Convert to negative (BC)
+      color: editedColor,
     };
     
     onUpdateCivilization(updated);
     setEditMode(false);
+    setShowColorPicker(false);
   };
 
   const handleDeleteCivilization = () => {
@@ -240,11 +276,90 @@ export function InspectorPanel({
               <View style={styles.metaRow}>
                 <View style={styles.metaItem}>
                   <Clock size={14} color="#c9a227" />
-                  <Text style={styles.metaText}>
-                    {formatYear(selectedCivilization.startYear)} - {formatYear(selectedCivilization.endYear)}
-                  </Text>
+                  <TextInput
+                    style={[styles.editInputSmall, { flex: 0, width: 80, marginRight: 8 }]}
+                    value={editedStartYear}
+                    onChangeText={setEditedStartYear}
+                    placeholder="Başlangıç"
+                    placeholderTextColor="#666"
+                    keyboardType="numeric"
+                  />
+                  <Text style={styles.metaText}>-</Text>
+                  <TextInput
+                    style={[styles.editInputSmall, { flex: 0, width: 80, marginLeft: 8 }]}
+                    value={editedEndYear}
+                    onChangeText={setEditedEndYear}
+                    placeholder="Bitiş"
+                    placeholderTextColor="#666"
+                    keyboardType="numeric"
+                  />
+                  <Text style={styles.metaText}>M.Ö.</Text>
                 </View>
               </View>
+
+              <View style={styles.metaRow}>
+                <View style={styles.metaItem}>
+                  <Palette size={14} color="#c9a227" />
+                  <TouchableOpacity
+                    style={[styles.colorPreview, { backgroundColor: editedColor }]}
+                    onPress={() => setShowColorPicker(!showColorPicker)}
+                  >
+                    <Text style={styles.colorPreviewText}>Renk Seç</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {showColorPicker && (
+                <View style={styles.colorPickerContainer}>
+                  <Text style={styles.colorPickerTitle}>Renk Paleti</Text>
+                  <View style={styles.colorPalette}>
+                    {CIVILIZATION_COLORS.map((color) => (
+                      <TouchableOpacity
+                        key={color}
+                        style={[
+                          styles.colorOption,
+                          { backgroundColor: color },
+                          editedColor === color && styles.colorOptionSelected,
+                        ]}
+                        onPress={() => {
+                          setEditedColor(color);
+                          setShowColorPicker(false);
+                        }}
+                      />
+                    ))}
+                  </View>
+                  <Text style={styles.colorPickerTitle}>Özel Renk (Hex)</Text>
+                  <View style={styles.customColorRow}>
+                    <TextInput
+                      style={styles.customColorInput}
+                      value={customColor}
+                      onChangeText={setCustomColor}
+                      placeholder="#RRGGBB"
+                      placeholderTextColor="#666"
+                      maxLength={7}
+                    />
+                    <TouchableOpacity
+                      style={styles.customColorBtn}
+                      onPress={() => {
+                        if (/^#[0-9A-F]{6}$/i.test(customColor)) {
+                          setEditedColor(customColor);
+                          setShowColorPicker(false);
+                          setCustomColor("");
+                        } else {
+                          const msg = "Geçerli hex renk kodu girin (örn: #FF5733)";
+                          if (Platform.OS === "web") {
+                            if (typeof window !== "undefined") window.alert(msg);
+                          } else {
+                            Alert.alert("Hata", msg);
+                          }
+                        }
+                      }}
+                    >
+                      <Check size={16} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
 
               <View style={styles.divider} />
 
@@ -590,5 +705,77 @@ const styles = StyleSheet.create({
     color: "#666",
     fontSize: 14,
     fontStyle: "italic",
+  },
+  colorPreview: {
+    flex: 1,
+    height: 32,
+    borderRadius: 6,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#555",
+  },
+  colorPreviewText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  colorPickerContainer: {
+    backgroundColor: "#3a3a3a",
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#555",
+  },
+  colorPickerTitle: {
+    color: "#c9a227",
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  colorPalette: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  colorOption: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  colorOptionSelected: {
+    borderColor: "#fff",
+    borderWidth: 3,
+  },
+  customColorRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+  },
+  customColorInput: {
+    flex: 1,
+    backgroundColor: "#2a2a2a",
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    color: "#fff",
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: "#555",
+  },
+  customColorBtn: {
+    backgroundColor: "#c9a227",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

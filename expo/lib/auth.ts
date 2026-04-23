@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { databaseService } from "./database";
+import * as bcrypt from "bcryptjs";
 
 const STORAGE_KEY = "@timeline_auth";
 
@@ -42,26 +43,27 @@ class AuthService {
       // Fallback to demo mode if database is not available
       console.warn("Database login failed, using demo mode:", error);
     }
-    
-    // Demo mode fallback
-    const demoUsers = [
-      { username: "admin", password: "admin123" },
-      { username: "demo", password: "demo123" }
-    ];
-
-    const demoUser = demoUsers.find(
-      u => u.username === username && u.password === password
-    );
-
-    if (demoUser) {
-      const user = { username: demoUser.username };
-      this.currentUser = user;
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-      notifyAuthStateChange();
-      return user;
-    }
 
     throw new Error("Geçersiz kullanıcı adı veya şifre");
+  }
+
+  async register(username: string, password: string): Promise<User> {
+    try {
+      // Hash password before storing
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await databaseService.register(username, hashedPassword);
+      
+      if (user && user.username) {
+        this.currentUser = { username: user.username };
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.currentUser));
+        notifyAuthStateChange();
+        return this.currentUser;
+      }
+    } catch (error) {
+      console.error("Registration failed:", error);
+    }
+
+    throw new Error("Kayıt başarısız oldu");
   }
 
   async logout(): Promise<void> {

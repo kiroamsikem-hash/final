@@ -1,5 +1,6 @@
 // Google Cloud SQL MySQL API endpoint
 const mysql = require('mysql2/promise');
+const bcrypt = require('bcryptjs');
 
 // Database connection configuration
 const dbConfig = {
@@ -136,6 +137,8 @@ export default async function handler(req, res) {
     switch (action) {
       case 'login':
         return await handleLogin(req, res, data);
+      case 'register':
+        return await handleRegister(req, res, data);
       case 'getCivilizations':
         return await handleGetCivilizations(req, res);
       case 'getEvents':
@@ -161,19 +164,64 @@ export default async function handler(req, res) {
   }
 }
 
-// Login handler
+// Login handler - now supports bcrypt hashed passwords
 async function handleLogin(req, res, data) {
   const { username, password } = data;
   
   const [rows] = await pool.execute(
-    'SELECT * FROM users WHERE username = ? AND password = ?',
-    [username, password]
+    'SELECT * FROM users WHERE username = ?',
+    [username]
   );
 
   if (rows.length > 0) {
-    res.status(200).json({ success: true, user: { username: rows[0].username } });
+    const user = rows[0];
+    
+    // Check if password is hashed (starts with $2a$ or $2b$ for bcrypt)
+    const isHashed = user.password.startsWith('$2a$') || user.password.startsWith('$2b$');
+    
+    let passwordMatch = false;
+    if (isHashed) {
+      // Compare with bcrypt
+      passwordMatch = await bcrypt.compare(password, user.password);
+    } else {
+      // Plain text comparison (for backward compatibility)
+      passwordMatch = password === user.password;
+    }
+    
+    if (passwordMatch) {
+      res.status(200).json({ success: true, data: { username: user.username } });
+    } else {
+      res.status(401).json({ success: false, error: 'Invalid credentials' });
+    }
   } else {
-    res.status(401).json({ error: 'Invalid credentials' });
+    res.status(401).json({ success: false, error: 'Invalid credentials' });
+  }
+}
+
+// Register handler
+async function handleRegister(req, res, data) {
+  const { username, password } = data;
+  
+  try {
+    // Check if user already exists
+    const [existing] = await pool.execute(
+      'SELECT * FROM users WHERE username = ?',
+      [username]
+    );
+    
+    if (existing.length > 0) {
+      return res.status(400).json({ success: false, error: 'Username already exists' });
+    }
+    
+    // Insert new user with hashed password
+    await pool.execute(
+      'INSERT INTO users (username, password) VALUES (?, ?)',
+      [username, password] // Password is already hashed from auth.ts
+    );
+    
+    res.status(200).json({ success: true, data: { username } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 }
 

@@ -37,6 +37,10 @@ class DatabaseService {
     return await this.makeRequest('login', { username, password });
   }
 
+  async register(username: string, hashedPassword: string) {
+    return await this.makeRequest('register', { username, password: hashedPassword });
+  }
+
   // Civilizations
   async getCivilizations(): Promise<Civilization[]> {
     return await this.makeRequest('getCivilizations');

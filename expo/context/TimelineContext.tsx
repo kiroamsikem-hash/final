@@ -58,6 +58,34 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
   const [selectedCivilization, setSelectedCivilization] = useState<Civilization | null>(null);
   const [selectedCell, setSelectedCell] = useState<Cell | null>(null);
 
+  // Real-time sync: Poll database every 5 seconds
+  useEffect(() => {
+    const syncInterval = setInterval(async () => {
+      try {
+        const [dbCivs, dbEvents, dbCellData] = await Promise.all([
+          databaseService.getCivilizations(),
+          databaseService.getEvents(),
+          databaseService.getCellData()
+        ]);
+
+        if (dbCivs && dbCivs.length > 0) {
+          setCivilizations(dbCivs);
+        }
+        if (dbEvents && dbEvents.length > 0) {
+          setEvents(dbEvents);
+        }
+        if (dbCellData) {
+          setCellData(dbCellData);
+        }
+      } catch (error) {
+        // Silently fail - database might be unavailable
+        console.debug("Sync failed:", error);
+      }
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(syncInterval);
+  }, []);
+
   useEffect(() => {
     loadInitialData();
   }, []);
