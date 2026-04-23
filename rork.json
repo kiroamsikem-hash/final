@@ -1,0 +1,15 @@
+{
+  "$schema": "https://rork.com/schema/rork.json",
+  "apps": [
+    {
+      "name": "Western Anatolia Chronology",
+      "path": "expo",
+      "framework": "react-native"
+    },
+    {
+      "name": "Western Anatolia Timeline",
+      "path": "expo",
+      "framework": "react-native"
+    }
+  ]
+}
