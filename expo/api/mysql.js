@@ -145,6 +145,8 @@ async function handler(req, res) {
         return await handleGetEvents(req, res);
       case 'getCellData':
         return await handleGetCellData(req, res);
+      case 'getPeriods':
+        return await handleGetPeriods(req, res);
       case 'saveCivilization':
         return await handleSaveCivilization(req, res, data);
       case 'saveEvent':
@@ -274,6 +276,13 @@ async function handleGetCellData(req, res) {
   }));
 
   res.status(200).json({ success: true, data: cellData });
+}
+
+// Get unique periods from events
+async function handleGetPeriods(req, res) {
+  const [rows] = await pool.execute('SELECT DISTINCT period FROM events WHERE period IS NOT NULL ORDER BY period');
+  const periods = rows.map(row => row.period);
+  res.status(200).json({ success: true, data: periods });
 }
 
 // Save civilization
