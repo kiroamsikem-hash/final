@@ -58,7 +58,7 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
   const [selectedCivilization, setSelectedCivilization] = useState<Civilization | null>(null);
   const [selectedCell, setSelectedCell] = useState<Cell | null>(null);
 
-  // Real-time sync: Polling every 10 seconds
+  // Real-time sync: Polling every 5 seconds
   useEffect(() => {
     const pollInterval = setInterval(async () => {
       try {
@@ -75,7 +75,7 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error('Polling error:', error);
       }
-    }, 10000); // Poll every 10 seconds
+    }, 5000); // Poll every 5 seconds
 
     return () => {
       clearInterval(pollInterval);

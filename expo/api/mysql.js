@@ -383,42 +383,72 @@ async function handleSaveEvent(req, res, data) {
 
 // Save cell data
 async function handleSaveCellData(req, res, data) {
+  console.log('📥 Received cell data to save:', JSON.stringify(data, null, 2));
+  
   // Support both camelCase (frontend) and snake_case (database)
   const { 
     id, 
     year, 
-    civilizationId, civilization_id = civilizationId,
+    civilizationId, 
+    civilization_id,
     photos, 
     tags, 
     notes, 
     name, 
-    relatedCells, related_cells = relatedCells
+    relatedCells, 
+    related_cells
   } = data;
+  
+  // Use whichever is defined
+  const finalCivId = civilization_id || civilizationId;
+  const finalRelatedCells = related_cells || relatedCells;
   
   // Convert undefined to null for MySQL
   const toNull = (val) => val === undefined ? null : val;
   
-  await pool.execute(`
-    INSERT INTO cell_data (id, year, civilization_id, photos, tags, notes, name, related_cells)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ON DUPLICATE KEY UPDATE
-    photos = VALUES(photos),
-    tags = VALUES(tags),
-    notes = VALUES(notes),
-    name = VALUES(name),
-    related_cells = VALUES(related_cells)
-  `, [
-    toNull(id), 
-    toNull(year), 
-    toNull(civilization_id), 
-    JSON.stringify(photos || []), 
-    JSON.stringify(tags || []), 
-    toNull(notes), 
-    toNull(name), 
-    JSON.stringify(related_cells || [])
-  ]);
-
-  res.status(200).json({ success: true });
+  // Ensure arrays are properly stringified
+  const photosJson = JSON.stringify(photos || []);
+  const tagsJson = JSON.stringify(tags || []);
+  const relatedCellsJson = JSON.stringify(finalRelatedCells || []);
+  
+  console.log('💾 Saving to database:', {
+    id: toNull(id),
+    year: toNull(year),
+    civilization_id: toNull(finalCivId),
+    photos: photosJson,
+    tags: tagsJson,
+    notes: toNull(notes),
+    name: toNull(name),
+    related_cells: relatedCellsJson
+  });
+  
+  try {
+    await pool.execute(`
+      INSERT INTO cell_data (id, year, civilization_id, photos, tags, notes, name, related_cells)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+      photos = VALUES(photos),
+      tags = VALUES(tags),
+      notes = VALUES(notes),
+      name = VALUES(name),
+      related_cells = VALUES(related_cells)
+    `, [
+      toNull(id), 
+      toNull(year), 
+      toNull(finalCivId), 
+      photosJson, 
+      tagsJson, 
+      toNull(notes), 
+      toNull(name), 
+      relatedCellsJson
+    ]);
+    
+    console.log('✅ Cell data saved successfully!');
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('❌ Error saving cell data:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 }
 
 // Delete civilization
