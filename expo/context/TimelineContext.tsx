@@ -58,7 +58,7 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
   const [selectedCivilization, setSelectedCivilization] = useState<Civilization | null>(null);
   const [selectedCell, setSelectedCell] = useState<Cell | null>(null);
 
-  // Real-time sync: Polling every 2 seconds
+  // Real-time sync: Polling every 5 seconds (increased from 2 to reduce conflicts)
   useEffect(() => {
     const pollInterval = setInterval(async () => {
       try {
@@ -68,24 +68,25 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
           databaseService.getCellData()
         ]);
 
-        if (dbCivs) {
+        // Only update if data actually changed (deep comparison by JSON)
+        if (dbCivs && JSON.stringify(dbCivs) !== JSON.stringify(civilizations)) {
           setCivilizations(dbCivs);
         }
-        if (dbEvents) {
+        if (dbEvents && JSON.stringify(dbEvents) !== JSON.stringify(events)) {
           setEvents(dbEvents);
         }
-        if (dbCellData) {
+        if (dbCellData && JSON.stringify(dbCellData) !== JSON.stringify(cellData)) {
           setCellData(dbCellData);
         }
       } catch (error) {
         console.error('Polling error:', error);
       }
-    }, 2000); // Poll every 2 seconds
+    }, 5000); // Poll every 5 seconds (increased from 2)
 
     return () => {
       clearInterval(pollInterval);
     };
-  }, []);
+  }, [civilizations, events, cellData]); // Add dependencies for comparison
 
   useEffect(() => {
     loadInitialData();
