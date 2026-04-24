@@ -107,7 +107,7 @@ const initPromise = Promise.race([
   return result;
 });
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -349,3 +349,7 @@ async function handleDeleteEvent(req, res, data) {
   await pool.execute('DELETE FROM events WHERE id = ?', [id]);
   res.status(200).json({ success: true });
 }
+
+// Export for CommonJS
+module.exports = handler;
+module.exports.default = handler;
