@@ -8,6 +8,7 @@ export interface Civilization {
   color: string;
   tags: string[];
   photoUrl?: string;
+  displayOrder?: number;
 }
 
 export interface PeriodEvent {

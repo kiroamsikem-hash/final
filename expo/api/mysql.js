@@ -242,7 +242,7 @@ function safeJSONParse(jsonString, defaultValue = []) {
 
 // Get civilizations
 async function handleGetCivilizations(req, res) {
-  const [rows] = await pool.execute('SELECT * FROM civilizations ORDER BY start_year DESC');
+  const [rows] = await pool.execute('SELECT * FROM civilizations ORDER BY display_order ASC, start_year DESC');
   
   const civilizations = rows.map(row => ({
     ...row,
@@ -297,15 +297,16 @@ async function handleSaveCivilization(req, res, data) {
     description, 
     color, 
     tags, 
-    photoUrl, photo_url = photoUrl 
+    photoUrl, photo_url = photoUrl,
+    displayOrder, display_order = displayOrder
   } = data;
   
   // Convert undefined to null for MySQL
   const toNull = (val) => val === undefined ? null : val;
   
   await pool.execute(`
-    INSERT INTO civilizations (id, name, region, start_year, end_year, description, color, tags, photo_url)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO civilizations (id, name, region, start_year, end_year, description, color, tags, photo_url, display_order)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
     name = VALUES(name),
     region = VALUES(region),
@@ -314,7 +315,8 @@ async function handleSaveCivilization(req, res, data) {
     description = VALUES(description),
     color = VALUES(color),
     tags = VALUES(tags),
-    photo_url = VALUES(photo_url)
+    photo_url = VALUES(photo_url),
+    display_order = VALUES(display_order)
   `, [
     toNull(id), 
     toNull(name), 
@@ -324,7 +326,8 @@ async function handleSaveCivilization(req, res, data) {
     toNull(description), 
     toNull(color), 
     JSON.stringify(tags || []), 
-    toNull(photo_url)
+    toNull(photo_url),
+    toNull(display_order)
   ]);
 
   res.status(200).json({ success: true });

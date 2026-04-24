@@ -422,8 +422,15 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
       const updated = [...prev];
       const [moved] = updated.splice(fromIndex, 1);
       updated.splice(toIndex, 0, moved);
-      saveCivilizations(updated);
-      return updated;
+      
+      // Update display_order for all civilizations
+      const withOrder = updated.map((civ, index) => ({
+        ...civ,
+        displayOrder: index
+      }));
+      
+      saveCivilizations(withOrder);
+      return withOrder;
     });
   }, [saveCivilizations]);
 
