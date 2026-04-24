@@ -383,7 +383,20 @@ async function handleSaveEvent(req, res, data) {
 
 // Save cell data
 async function handleSaveCellData(req, res, data) {
-  const { id, year, civilization_id, photos, tags, notes, name, related_cells } = data;
+  // Support both camelCase (frontend) and snake_case (database)
+  const { 
+    id, 
+    year, 
+    civilizationId, civilization_id = civilizationId,
+    photos, 
+    tags, 
+    notes, 
+    name, 
+    relatedCells, related_cells = relatedCells
+  } = data;
+  
+  // Convert undefined to null for MySQL
+  const toNull = (val) => val === undefined ? null : val;
   
   await pool.execute(`
     INSERT INTO cell_data (id, year, civilization_id, photos, tags, notes, name, related_cells)
@@ -394,7 +407,16 @@ async function handleSaveCellData(req, res, data) {
     notes = VALUES(notes),
     name = VALUES(name),
     related_cells = VALUES(related_cells)
-  `, [id, year, civilization_id, JSON.stringify(photos || []), JSON.stringify(tags || []), notes, name, JSON.stringify(related_cells || [])]);
+  `, [
+    toNull(id), 
+    toNull(year), 
+    toNull(civilization_id), 
+    JSON.stringify(photos || []), 
+    JSON.stringify(tags || []), 
+    toNull(notes), 
+    toNull(name), 
+    JSON.stringify(related_cells || [])
+  ]);
 
   res.status(200).json({ success: true });
 }
