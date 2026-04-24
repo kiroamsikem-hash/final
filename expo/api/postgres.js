@@ -6,7 +6,10 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgresql://admin:Kivi2020-@db.anatoliarchieve.info:6432/ana_veritabani',
   ssl: {
     rejectUnauthorized: false
-  }
+  },
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+  max: 5,
 });
 
 // Initialize database tables
