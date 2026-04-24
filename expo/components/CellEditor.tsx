@@ -96,7 +96,10 @@ export function CellEditor({
   const [eventStartYear, setEventStartYear] = useState("");
   const [eventEndYear, setEventEndYear] = useState("");
   const [eventTags, setEventTags] = useState("");
+  const [eventColor, setEventColor] = useState<string | undefined>(undefined);
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [availablePeriods, setAvailablePeriods] = useState<string[]>(SUGGESTED_PERIODS);
 
   const cellData = useMemo(() => {
     if (!cell) return null;
@@ -130,6 +133,28 @@ export function CellEditor({
     }
   }, [visible, cellData]);
 
+  // Load available periods from database
+  useEffect(() => {
+    const loadPeriods = async () => {
+      try {
+        const response = await fetch('/api/mysql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'getPeriods' }),
+        });
+        const result = await response.json();
+        if (result.success && result.data && result.data.length > 0) {
+          setAvailablePeriods(result.data);
+        }
+      } catch (error) {
+        console.warn('Failed to load periods:', error);
+      }
+    };
+    if (visible) {
+      loadPeriods();
+    }
+  }, [visible]);
+
   const resetEventForm = () => {
     setEventTitle("");
     setEventDescription("");
@@ -137,8 +162,10 @@ export function CellEditor({
     setEventStartYear(cell ? String(Math.abs(cell.year)) : "");
     setEventEndYear(cell ? String(Math.abs(cell.year)) : "");
     setEventTags("");
+    setEventColor(undefined);
     setShowEventForm(false);
     setShowPeriodDropdown(false);
+    setShowColorPicker(false);
   };
 
   const formatYear = (year: number): string => {
@@ -291,6 +318,7 @@ export function CellEditor({
       period: eventPeriod,
       civilizationId: cell.civilizationId,
       tags: eventTags.split(",").map(t => t.trim()).filter(Boolean),
+      color: eventColor,
     };
 
     timelineCtx.addEvent(newEvent);
@@ -386,7 +414,7 @@ export function CellEditor({
             </TouchableOpacity>
             {showPeriodDropdown && (
               <View style={styles.dropdownMenu}>
-                {SUGGESTED_PERIODS.map((period) => (
+                {availablePeriods.map((period) => (
                   <TouchableOpacity
                     key={period}
                     style={styles.dropdownItem}
@@ -414,6 +442,47 @@ export function CellEditor({
               value={eventTags}
               onChangeText={setEventTags}
             />
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>Event Rengi (Opsiyonel)</Text>
+            <TouchableOpacity
+              style={[styles.colorPreviewButton, eventColor && { backgroundColor: eventColor }]}
+              onPress={() => setShowColorPicker(!showColorPicker)}
+            >
+              <Text style={styles.colorPreviewText}>
+                {eventColor ? "Renk Seçildi" : "Renk Seç"}
+              </Text>
+            </TouchableOpacity>
+            {showColorPicker && (
+              <View style={styles.colorPickerContainer}>
+                <View style={styles.colorPalette}>
+                  {TAG_COLORS.map((color) => (
+                    <TouchableOpacity
+                      key={color}
+                      style={[
+                        styles.colorOption,
+                        { backgroundColor: color },
+                        eventColor === color && styles.colorOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setEventColor(color);
+                        setShowColorPicker(false);
+                      }}
+                    />
+                  ))}
+                </View>
+                <TouchableOpacity
+                  style={styles.clearColorButton}
+                  onPress={() => {
+                    setEventColor(undefined);
+                    setShowColorPicker(false);
+                  }}
+                >
+                  <Text style={styles.clearColorText}>Rengi Temizle</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           <TouchableOpacity style={styles.createEventButton} onPress={handleCreateEvent}>
@@ -1433,6 +1502,57 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "700",
+  },
+  // Color Picker Styles
+  colorPreviewButton: {
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: "#3a3a3a",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#555",
+  },
+  colorPreviewText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  colorPickerContainer: {
+    backgroundColor: "#3a3a3a",
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#555",
+  },
+  colorPalette: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 12,
+  },
+  colorOption: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  colorOptionSelected: {
+    borderColor: "#fff",
+    borderWidth: 3,
+  },
+  clearColorButton: {
+    backgroundColor: "#dc143c",
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  clearColorText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
   },
   // Related Cells Styles
   relatedCellsList: {
