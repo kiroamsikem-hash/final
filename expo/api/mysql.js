@@ -291,6 +291,9 @@ async function handleSaveCivilization(req, res, data) {
     photoUrl, photo_url = photoUrl 
   } = data;
   
+  // Convert undefined to null for MySQL
+  const toNull = (val) => val === undefined ? null : val;
+  
   await pool.execute(`
     INSERT INTO civilizations (id, name, region, start_year, end_year, description, color, tags, photo_url)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -303,7 +306,17 @@ async function handleSaveCivilization(req, res, data) {
     color = VALUES(color),
     tags = VALUES(tags),
     photo_url = VALUES(photo_url)
-  `, [id, name, region, start_year, end_year, description, color, JSON.stringify(tags || []), photo_url]);
+  `, [
+    toNull(id), 
+    toNull(name), 
+    toNull(region), 
+    toNull(start_year), 
+    toNull(end_year), 
+    toNull(description), 
+    toNull(color), 
+    JSON.stringify(tags || []), 
+    toNull(photo_url)
+  ]);
 
   res.status(200).json({ success: true });
 }
@@ -324,6 +337,9 @@ async function handleSaveEvent(req, res, data) {
     color
   } = data;
   
+  // Convert undefined to null for MySQL
+  const toNull = (val) => val === undefined ? null : val;
+  
   await pool.execute(`
     INSERT INTO events (id, title, description, start_year, end_year, period, civilization_id, tags, photo_url, color)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -337,7 +353,21 @@ async function handleSaveEvent(req, res, data) {
     tags = VALUES(tags),
     photo_url = VALUES(photo_url),
     color = VALUES(color)
-  `, [id, title, description, start_year, end_year, period, civilization_id, JSON.stringify(tags || []), photo_url, color || null]);
+  `, [
+    toNull(id), 
+    toNull(title), 
+    toNull(description), 
+    toNull(start_year), 
+    toNull(end_year), 
+    toNull(period), 
+    toNull(civilization_id), 
+    JSON.stringify(tags || []), 
+    toNull(photo_url), 
+    toNull(color)
+  ]);
+
+  res.status(200).json({ success: true });
+}
 
   res.status(200).json({ success: true });
 }
