@@ -1389,7 +1389,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#1a1a1a",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: SCREEN_HEIGHT * 0.75,
+    maxHeight: SCREEN_HEIGHT * 0.85,
     paddingBottom: Platform.OS === "ios" ? 34 : 20,
   },
   eventFormHeader: {
@@ -1406,6 +1406,7 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   eventFormScroll: {
+    flex: 1,
     padding: 20,
   },
   formGroup: {

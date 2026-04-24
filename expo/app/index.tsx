@@ -1103,20 +1103,22 @@ const styles = StyleSheet.create({
   reorderRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 8,
     marginBottom: 4,
   },
   reorderArrow: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    backgroundColor: "rgba(201,162,39,0.2)",
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "rgba(201,162,39,0.3)",
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(201,162,39,0.5)",
   },
   reorderArrowText: {
     color: "#c9a227",
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: "800",
   },
   civHeaderReorder: {
