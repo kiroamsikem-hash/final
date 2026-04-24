@@ -1,7 +1,7 @@
 import { Civilization, PeriodEvent, CellData } from "@/types";
 
-// Use relative URL for production (works with Nginx proxy)
-const API_BASE_URL = "/api/mysql";
+// Use PostgreSQL API endpoint
+const API_BASE_URL = "/api/postgres";
 
 class DatabaseService {
   private async makeRequest(action: string, data?: any) {

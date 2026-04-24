@@ -23,8 +23,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Import MySQL handler
-const mysqlHandler = require('./expo/api/mysql.js').default;
+// Import PostgreSQL handler (better for large data!)
+const postgresHandler = require('./expo/api/postgres.js').default;
 
 // WebSocket connection handling
 io.on('connection', (socket) => {
@@ -41,13 +41,13 @@ function broadcastDataChange(type, action, id) {
   io.emit('dataChanged', { type, action, id });
 }
 
-// API endpoint with WebSocket broadcasting
-app.post('/api/mysql', async (req, res) => {
+// API endpoint with WebSocket broadcasting - PostgreSQL
+app.post('/api/postgres', async (req, res) => {
   try {
     const { action, data } = req.body;
     
-    // Call the MySQL handler
-    await mysqlHandler(req, res);
+    // Call the PostgreSQL handler
+    await postgresHandler(req, res);
     
     // Broadcast changes for write operations
     if (action === 'saveCivilization') {
@@ -67,6 +67,13 @@ app.post('/api/mysql', async (req, res) => {
       res.status(500).json({ error: error.message });
     }
   }
+});
+
+// Keep MySQL endpoint for backward compatibility
+app.post('/api/mysql', async (req, res) => {
+  // Redirect to PostgreSQL
+  req.url = '/api/postgres';
+  return app.handle(req, res);
 });
 
 // Health check endpoint
