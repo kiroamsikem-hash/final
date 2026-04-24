@@ -3,7 +3,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Civilization, PeriodEvent, YearRow, Cell, CellData, CellPhoto } from "@/types";
 import { initialCivilizations, initialEvents } from "@/data/initialData";
 import { databaseService } from "@/lib/database";
-import { io, Socket } from "socket.io-client";
 
 interface TimelineContextType {
   civilizations: Civilization[];
@@ -58,27 +57,10 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
   const [selectedEvent, setSelectedEvent] = useState<PeriodEvent | null>(null);
   const [selectedCivilization, setSelectedCivilization] = useState<Civilization | null>(null);
   const [selectedCell, setSelectedCell] = useState<Cell | null>(null);
-  const [socket, setSocket] = useState<Socket | null>(null);
 
-  // Real-time sync: WebSocket connection
+  // Real-time sync: Polling every 2 seconds
   useEffect(() => {
-    // Connect to WebSocket server (Nginx proxies /socket.io/ to port 8084)
-    const socketInstance = io({
-      path: '/socket.io/',
-      transports: ['websocket', 'polling'],
-    });
-
-    socketInstance.on('connect', () => {
-      console.log('✅ WebSocket connected');
-    });
-
-    socketInstance.on('disconnect', () => {
-      console.log('❌ WebSocket disconnected');
-    });
-
-    // Listen for data changes from server
-    socketInstance.on('dataChanged', async () => {
-      console.log('📥 Data changed - reloading from database');
+    const pollInterval = setInterval(async () => {
       try {
         const [dbCivs, dbEvents, dbCellData] = await Promise.all([
           databaseService.getCivilizations(),
@@ -96,14 +78,12 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
           setCellData(dbCellData);
         }
       } catch (error) {
-        console.error('Failed to reload data:', error);
+        console.error('Polling error:', error);
       }
-    });
-
-    setSocket(socketInstance);
+    }, 2000); // Poll every 2 seconds
 
     return () => {
-      socketInstance.disconnect();
+      clearInterval(pollInterval);
     };
   }, []);
 

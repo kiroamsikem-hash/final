@@ -59,6 +59,7 @@ export function InspectorPanel({
   React.useEffect(() => {
     setEditMode(false);
   }, [selectedCivilization?.id]);
+
   const formatYear = (year: number): string => {
     return `${Math.abs(year)} BC`;
   };
@@ -503,17 +504,23 @@ export function InspectorPanel({
 }
 
 function getPeriodColor(period: string): string {
+  // Inline color mapping - no dependency on types export
   const colors: Record<string, string> = {
-    Prepalatial: "#8B4513",
-    Protopalatial: "#CD853F",
-    Neopalatial: "#DAA520",
-    Postpalatial: "#B8860B",
-    Archaic: "#4682B4",
-    Classical: "#5F9EA0",
-    Hellenistic: "#6495ED",
-    Other: "#708090",
+    "Neolithic": "#8B7355",
+    "Bronze Age": "#CD7F32",
+    "Iron Age": "#71797E",
+    "Archaic": "#4682B4",
+    "Classical": "#5F9EA0",
+    "Hellenistic": "#6495ED",
+    "Roman": "#8B0000",
+    "Byzantine": "#9370DB",
+    "Medieval": "#8B4513",
+    "Renaissance": "#DAA520",
+    "Early Modern": "#2E8B57",
+    "Modern": "#4169E1",
+    "Other": "#708090",
   };
-  return colors[period] || colors.Other;
+  return colors[period] || colors["Other"];
 }
 
 const styles = StyleSheet.create({

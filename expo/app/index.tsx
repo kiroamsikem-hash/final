@@ -42,24 +42,16 @@ import { TimelineGrid } from "../components/TimelineGrid";
 import { InspectorPanel } from "../components/InspectorPanel";
 import { CellEditor } from "../components/CellEditor";
 import {
-  PERIOD_RANGES,
   Civilization,
   PeriodEvent,
   Cell,
-  HistoricalPeriod,
 } from "../types";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 
-const PERIODS: { id: HistoricalPeriod | null; label: string; color: string }[] = [
+// Dynamic period filter - shows all unique periods from events
+const PERIODS: { id: string | null; label: string; color: string }[] = [
   { id: null, label: "All", color: "#c9a227" },
-  { id: "Prepalatial", label: "Prepalatial", color: "#8B4513" },
-  { id: "Protopalatial", label: "Protopal.", color: "#CD853F" },
-  { id: "Neopalatial", label: "Neopalatial", color: "#DAA520" },
-  { id: "Postpalatial", label: "Postpalatial", color: "#B8860B" },
-  { id: "Archaic", label: "Archaic", color: "#4682B4" },
-  { id: "Classical", label: "Classical", color: "#5F9EA0" },
-  { id: "Hellenistic", label: "Hellenistic", color: "#6495ED" },
 ];
 
 export default function TimelineScreen() {
@@ -75,7 +67,7 @@ export default function TimelineScreen() {
   const [cellEditorOpen, setCellEditorOpen] = useState<boolean>(false);
   const [searchOpen, setSearchOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [periodFilter, setPeriodFilter] = useState<HistoricalPeriod | null>(null);
+  const [periodFilter, setPeriodFilter] = useState<string | null>(null);
   const [showMinimap, setShowMinimap] = useState<boolean>(false);
   const [fabOpen, setFabOpen] = useState<boolean>(false);
   const [reorderMode, setReorderMode] = useState<boolean>(false);
@@ -170,12 +162,7 @@ export default function TimelineScreen() {
     timelineCtx.setSelectedCell(null);
   }, [timelineCtx]);
 
-  const getPeriodName = useCallback((year: number): string | null => {
-    for (const [name, range] of Object.entries(PERIOD_RANGES)) {
-      if (year <= range.start && year >= range.end) return name;
-    }
-    return null;
-  }, []);
+  // Removed getPeriodName - periods are now dynamic, not based on year ranges
 
   const formatYearLabel = useCallback(
     (year: number): string => {
@@ -379,11 +366,8 @@ export default function TimelineScreen() {
         const startYear = parseYear(startRaw);
         const endYear = endRaw ? parseYear(endRaw) : startYear;
         const civId = ensureCiv(civName || "Imported");
-        const periodValid: HistoricalPeriod[] = [
-          "Prepalatial", "Protopalatial", "Neopalatial", "Postpalatial",
-          "Archaic", "Classical", "Hellenistic", "Other",
-        ];
-        const period = (periodValid.find((p) => p.toLowerCase() === periodRaw.toLowerCase()) ?? "Other") as HistoricalPeriod;
+        // Accept any period string from CSV, default to "Other" if empty
+        const period = periodRaw?.trim() || "Other";
 
         newEvents.push({
           id: `evt-imp-${Date.now()}-${i}`,
@@ -785,7 +769,7 @@ ${report.eventsByPeriod.map(p => `• ${p.period}: ${p.count} olay`).join('\n')}
           {/* Frozen side column: Period + Year */}
           <View style={[styles.sideColumn, { width: sideColumnWidth }]}>
             {yearsList.map((year, i) => {
-              const periodName = getPeriodName(year);
+              // Removed periodName - periods are now dynamic, not based on year ranges
               const isRowSel = timelineCtx.selectedRow === year;
               const isCentury =
                 settingsCtx.settings.highlightCenturies && year % 100 === 0;
@@ -822,11 +806,6 @@ ${report.eventsByPeriod.map(p => `• ${p.period}: ${p.count} olay`).join('\n')}
                   >
                     {formatYearLabel(year)}
                   </Text>
-                  {periodName && (
-                    <Text style={styles.periodLabel} numberOfLines={1}>
-                      {periodName}
-                    </Text>
-                  )}
                   {isRowSel && (
                     <TouchableOpacity
                       style={styles.rowDeleteBtn}

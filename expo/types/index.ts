@@ -16,10 +16,11 @@ export interface PeriodEvent {
   description: string;
   startYear: number;
   endYear: number;
-  period: HistoricalPeriod;
+  period: string; // Dynamic user-defined period
   civilizationId: string;
   tags: string[];
   photoUrl?: string;
+  color?: string; // Özel event rengi
 }
 
 export interface YearRow {
@@ -60,16 +61,6 @@ export interface CellPhoto {
   uploadedAt: number;
 }
 
-export type HistoricalPeriod = 
-  | "Prepalatial"
-  | "Protopalatial"
-  | "Neopalatial"
-  | "Postpalatial"
-  | "Archaic"
-  | "Classical"
-  | "Hellenistic"
-  | "Other";
-
 export interface TimelineSettings {
   startYear: number;
   endYear: number;
@@ -87,17 +78,6 @@ export interface TimelineSettings {
   compactMode: boolean;
 }
 
-export const PERIOD_COLORS: Record<HistoricalPeriod, string> = {
-  Prepalatial: "#8B4513",
-  Protopalatial: "#CD853F",
-  Neopalatial: "#DAA520",
-  Postpalatial: "#B8860B",
-  Archaic: "#4682B4",
-  Classical: "#5F9EA0",
-  Hellenistic: "#6495ED",
-  Other: "#708090",
-};
-
 export const CIVILIZATION_COLORS = [
   "#c9a227",
   "#8B4513",
@@ -110,10 +90,3 @@ export const CIVILIZATION_COLORS = [
   "#708090",
   "#8B0000",
 ];
-
-export const PERIOD_RANGES: Record<string, { start: number; end: number }> = {
-  Prepalatial: { start: -3650, end: -1900 },
-  Protopalatial: { start: -1900, end: -1750 },
-  Neopalatial: { start: -1750, end: -1500 },
-  Postpalatial: { start: -1500, end: -1170 },
-};

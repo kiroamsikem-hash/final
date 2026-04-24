@@ -27,7 +27,7 @@ import {
   Link2,
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
-import { Cell, Civilization, PeriodEvent, CellPhoto, HistoricalPeriod } from "@/types";
+import { Cell, Civilization, PeriodEvent, CellPhoto } from "@/types";
 import { useTimeline } from "@/context/TimelineContext";
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -41,14 +41,20 @@ interface CellEditorProps {
   onAddEvent?: (event: PeriodEvent) => void;
 }
 
-const PERIODS: HistoricalPeriod[] = [
-  "Prepalatial",
-  "Protopalatial",
-  "Neopalatial",
-  "Postpalatial",
+// Suggested periods - user can enter any custom period
+const SUGGESTED_PERIODS: string[] = [
+  "Neolithic",
+  "Bronze Age",
+  "Iron Age",
   "Archaic",
   "Classical",
   "Hellenistic",
+  "Roman",
+  "Byzantine",
+  "Medieval",
+  "Renaissance",
+  "Early Modern",
+  "Modern",
   "Other",
 ];
 
@@ -86,7 +92,7 @@ export function CellEditor({
   // Event form states
   const [eventTitle, setEventTitle] = useState("");
   const [eventDescription, setEventDescription] = useState("");
-  const [eventPeriod, setEventPeriod] = useState<HistoricalPeriod>("Other");
+  const [eventPeriod, setEventPeriod] = useState<string>("Other");
   const [eventStartYear, setEventStartYear] = useState("");
   const [eventEndYear, setEventEndYear] = useState("");
   const [eventTags, setEventTags] = useState("");
@@ -380,7 +386,7 @@ export function CellEditor({
             </TouchableOpacity>
             {showPeriodDropdown && (
               <View style={styles.dropdownMenu}>
-                {PERIODS.map((period) => (
+                {SUGGESTED_PERIODS.map((period) => (
                   <TouchableOpacity
                     key={period}
                     style={styles.dropdownItem}
@@ -951,16 +957,21 @@ export function CellEditor({
 
 function getPeriodColor(period: string): string {
   const colors: Record<string, string> = {
-    Prepalatial: "#8B4513",
-    Protopalatial: "#CD853F",
-    Neopalatial: "#DAA520",
-    Postpalatial: "#B8860B",
-    Archaic: "#4682B4",
-    Classical: "#5F9EA0",
-    Hellenistic: "#6495ED",
-    Other: "#708090",
+    "Neolithic": "#8B7355",
+    "Bronze Age": "#CD7F32",
+    "Iron Age": "#71797E",
+    "Archaic": "#4682B4",
+    "Classical": "#5F9EA0",
+    "Hellenistic": "#6495ED",
+    "Roman": "#8B0000",
+    "Byzantine": "#9370DB",
+    "Medieval": "#8B4513",
+    "Renaissance": "#DAA520",
+    "Early Modern": "#2E8B57",
+    "Modern": "#4169E1",
+    "Other": "#708090",
   };
-  return colors[period] || colors.Other;
+  return colors[period] || colors["Other"];
 }
 
 const styles = StyleSheet.create({

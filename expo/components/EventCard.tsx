@@ -13,10 +13,15 @@ export function EventCard({ event, onPress, compact = false }: EventCardProps) {
   const duration = event.startYear - event.endYear;
   const durationText = duration >= 100 ? `${Math.round(duration / 100) * 100}y` : `${duration}y`;
 
+  // Use event's custom color if available, otherwise use period color
+  const backgroundColor = event.color 
+    ? `${event.color}dd` // Add alpha for transparency
+    : getEventColor(event.period);
+
   if (compact) {
     return (
       <TouchableOpacity
-        style={[styles.compactContainer, { backgroundColor: getEventColor(event.period) }]}
+        style={[styles.compactContainer, { backgroundColor }]}
         onPress={onPress}
         activeOpacity={0.8}
       >
@@ -29,11 +34,11 @@ export function EventCard({ event, onPress, compact = false }: EventCardProps) {
 
   return (
     <TouchableOpacity
-      style={[styles.container, { backgroundColor: getEventColor(event.period) }]}
+      style={[styles.container, { backgroundColor }]}
       onPress={onPress}
       activeOpacity={0.8}
     >
-      <Text style={styles.title} numberOfLines={1}>
+      <Text style={styles.title} numberOfLines={2}>
         {event.title}
       </Text>
       {duration > 50 && (
@@ -53,62 +58,82 @@ export function EventCard({ event, onPress, compact = false }: EventCardProps) {
 }
 
 function getEventColor(period: string): string {
-  const colors: Record<string, string> = {
-    Prepalatial: "rgba(139, 69, 19, 0.85)",
-    Protopalatial: "rgba(205, 133, 63, 0.85)",
-    Neopalatial: "rgba(218, 165, 32, 0.85)",
-    Postpalatial: "rgba(184, 134, 11, 0.85)",
-    Archaic: "rgba(70, 130, 180, 0.85)",
-    Classical: "rgba(95, 158, 160, 0.85)",
-    Hellenistic: "rgba(100, 149, 237, 0.85)",
-    Other: "rgba(112, 128, 144, 0.85)",
+  // Inline color mapping - no dependency on types export
+  const periodColors: Record<string, string> = {
+    "Neolithic": "#8B7355",
+    "Bronze Age": "#CD7F32",
+    "Iron Age": "#71797E",
+    "Archaic": "#4682B4",
+    "Classical": "#5F9EA0",
+    "Hellenistic": "#6495ED",
+    "Roman": "#8B0000",
+    "Byzantine": "#9370DB",
+    "Medieval": "#8B4513",
+    "Renaissance": "#DAA520",
+    "Early Modern": "#2E8B57",
+    "Modern": "#4169E1",
+    "Other": "#708090",
   };
-  return colors[period] || colors.Other;
+  
+  const baseColor = periodColors[period] || periodColors["Other"];
+  // Convert hex to rgba with 0.85 opacity
+  const hex = baseColor.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, 0.85)`;
 }
 
 const styles = StyleSheet.create({
   container: {
     borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    marginVertical: 1,
-    minHeight: 24,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginVertical: 2,
+    minHeight: 32,
     justifyContent: "center",
   },
   compactContainer: {
     borderRadius: 3,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
     marginVertical: 1,
+    minHeight: 24,
   },
   title: {
     color: "#fff",
-    fontSize: 10,
-    fontWeight: "600",
+    fontSize: 13,
+    fontWeight: "700",
+    textShadowColor: "rgba(0, 0, 0, 0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   compactTitle: {
     color: "#fff",
-    fontSize: 9,
-    fontWeight: "500",
+    fontSize: 11,
+    fontWeight: "600",
   },
   duration: {
-    color: "rgba(255, 255, 255, 0.7)",
-    fontSize: 8,
-    marginTop: 1,
+    color: "rgba(255, 255, 255, 0.8)",
+    fontSize: 10,
+    marginTop: 2,
+    fontWeight: "500",
   },
   tagsContainer: {
     flexDirection: "row",
-    marginTop: 2,
+    marginTop: 3,
     flexWrap: "wrap",
   },
   tagBadge: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    borderRadius: 2,
-    paddingHorizontal: 3,
-    paddingVertical: 1,
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
+    borderRadius: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    marginRight: 4,
   },
   tagText: {
-    color: "rgba(255, 255, 255, 0.9)",
-    fontSize: 7,
+    color: "rgba(255, 255, 255, 0.95)",
+    fontSize: 9,
+    fontWeight: "500",
   },
 });

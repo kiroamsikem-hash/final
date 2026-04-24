@@ -225,13 +225,24 @@ async function handleRegister(req, res, data) {
   }
 }
 
+// Safe JSON parse helper
+function safeJSONParse(jsonString, defaultValue = []) {
+  if (!jsonString) return defaultValue;
+  try {
+    return JSON.parse(jsonString);
+  } catch (error) {
+    console.warn('⚠️ Invalid JSON, returning default:', jsonString);
+    return defaultValue;
+  }
+}
+
 // Get civilizations
 async function handleGetCivilizations(req, res) {
   const [rows] = await pool.execute('SELECT * FROM civilizations ORDER BY start_year DESC');
   
   const civilizations = rows.map(row => ({
     ...row,
-    tags: JSON.parse(row.tags || '[]')
+    tags: safeJSONParse(row.tags, [])
   }));
 
   res.status(200).json({ success: true, data: civilizations });
@@ -243,7 +254,7 @@ async function handleGetEvents(req, res) {
   
   const events = rows.map(row => ({
     ...row,
-    tags: JSON.parse(row.tags || '[]')
+    tags: safeJSONParse(row.tags, [])
   }));
 
   res.status(200).json({ success: true, data: events });
@@ -255,9 +266,9 @@ async function handleGetCellData(req, res) {
   
   const cellData = rows.map(row => ({
     ...row,
-    photos: JSON.parse(row.photos || '[]'),
-    tags: JSON.parse(row.tags || '[]'),
-    related_cells: JSON.parse(row.related_cells || '[]')
+    photos: safeJSONParse(row.photos, []),
+    tags: safeJSONParse(row.tags, []),
+    related_cells: safeJSONParse(row.related_cells, [])
   }));
 
   res.status(200).json({ success: true, data: cellData });
