@@ -3,7 +3,7 @@ const { Pool } = require('pg');
 
 // PostgreSQL connection
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgres://admin:senin_cok_guclu_sifren@db.senindomainin.com:6432/ana_veritabani',
+  connectionString: process.env.DATABASE_URL || 'postgresql://admin:Kivi2020-@db.anatoliarchieve.info:6432/ana_veritabani',
   ssl: {
     rejectUnauthorized: false
   }
