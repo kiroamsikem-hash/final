@@ -58,19 +58,9 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
   const [selectedCivilization, setSelectedCivilization] = useState<Civilization | null>(null);
   const [selectedCell, setSelectedCell] = useState<Cell | null>(null);
 
-  // Track if we're currently saving to prevent polling conflicts
-  const [isSaving, setIsSaving] = useState(false);
-  const savingTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-
-  // Real-time sync: Polling every 5 seconds (increased from 2 to reduce conflicts)
+  // Real-time sync: Polling every 10 seconds
   useEffect(() => {
     const pollInterval = setInterval(async () => {
-      // Skip polling if we're currently saving data
-      if (isSaving) {
-        console.log('⏸️ Skipping poll - save in progress');
-        return;
-      }
-
       try {
         const [dbCivs, dbEvents, dbCellData] = await Promise.all([
           databaseService.getCivilizations(),
@@ -78,31 +68,19 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
           databaseService.getCellData()
         ]);
 
-        // Only update if data actually changed (deep comparison by JSON)
-        if (dbCivs && JSON.stringify(dbCivs) !== JSON.stringify(civilizations)) {
-          console.log('🔄 Updating civilizations from database');
-          setCivilizations(dbCivs);
-        }
-        if (dbEvents && JSON.stringify(dbEvents) !== JSON.stringify(events)) {
-          console.log('🔄 Updating events from database');
-          setEvents(dbEvents);
-        }
-        if (dbCellData && JSON.stringify(dbCellData) !== JSON.stringify(cellData)) {
-          console.log('🔄 Updating cellData from database');
-          setCellData(dbCellData);
-        }
+        // Always update from database - database is source of truth
+        setCivilizations(dbCivs || []);
+        setEvents(dbEvents || []);
+        setCellData(dbCellData || []);
       } catch (error) {
         console.error('Polling error:', error);
       }
-    }, 5000); // Poll every 5 seconds (increased from 2)
+    }, 10000); // Poll every 10 seconds
 
     return () => {
       clearInterval(pollInterval);
-      if (savingTimeoutRef.current) {
-        clearTimeout(savingTimeoutRef.current);
-      }
     };
-  }, [civilizations, events, cellData, isSaving]); // Add dependencies for comparison
+  }, []); // No dependencies - just poll and update
 
   useEffect(() => {
     loadInitialData();
@@ -132,58 +110,34 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
 
   const saveCivilizations = useCallback(async (civs: Civilization[]) => {
     try {
-      // Set saving flag to prevent polling conflicts
-      setIsSaving(true);
-      if (savingTimeoutRef.current) clearTimeout(savingTimeoutRef.current);
-      
+      console.log('💾 Saving civilizations to database:', civs.length);
       // ONLY save to database - no AsyncStorage
       await databaseService.syncCivilizations(civs);
-      
-      // Clear saving flag after 2 seconds (enough time for save to complete)
-      savingTimeoutRef.current = setTimeout(() => {
-        setIsSaving(false);
-      }, 2000);
+      console.log('✅ Civilizations saved successfully');
     } catch (error) {
-      console.error("Error saving civilizations:", error);
-      setIsSaving(false);
+      console.error("❌ Error saving civilizations:", error);
     }
   }, []);
 
   const saveEvents = useCallback(async (evts: PeriodEvent[]) => {
     try {
-      // Set saving flag to prevent polling conflicts
-      setIsSaving(true);
-      if (savingTimeoutRef.current) clearTimeout(savingTimeoutRef.current);
-      
+      console.log('💾 Saving events to database:', evts.length);
       // ONLY save to database - no AsyncStorage
       await databaseService.syncEvents(evts);
-      
-      // Clear saving flag after 2 seconds (enough time for save to complete)
-      savingTimeoutRef.current = setTimeout(() => {
-        setIsSaving(false);
-      }, 2000);
+      console.log('✅ Events saved successfully');
     } catch (error) {
-      console.error("Error saving events:", error);
-      setIsSaving(false);
+      console.error("❌ Error saving events:", error);
     }
   }, []);
 
   const saveCellData = useCallback(async (data: CellData[]) => {
     try {
-      // Set saving flag to prevent polling conflicts
-      setIsSaving(true);
-      if (savingTimeoutRef.current) clearTimeout(savingTimeoutRef.current);
-      
+      console.log('💾 Saving cell data to database:', data.length, 'cells');
       // ONLY save to database - no AsyncStorage
       await databaseService.syncCellData(data);
-      
-      // Clear saving flag after 2 seconds (enough time for save to complete)
-      savingTimeoutRef.current = setTimeout(() => {
-        setIsSaving(false);
-      }, 2000);
+      console.log('✅ Cell data saved successfully');
     } catch (error) {
-      console.error("Error saving cell data:", error);
-      setIsSaving(false);
+      console.error("❌ Error saving cell data:", error);
     }
   }, []);
 
