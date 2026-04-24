@@ -137,7 +137,7 @@ export function CellEditor({
   useEffect(() => {
     const loadPeriods = async () => {
       try {
-        const response = await fetch('/api/mysql', {
+        const response = await fetch('/api/postgres', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'getPeriods' }),

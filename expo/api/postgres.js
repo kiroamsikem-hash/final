@@ -163,19 +163,57 @@ async function handleLogin(req, res, data) {
 // Get civilizations
 async function handleGetCivilizations(req, res) {
   const result = await pool.query('SELECT * FROM civilizations ORDER BY display_order ASC NULLS LAST, start_year DESC');
-  res.status(200).json({ success: true, data: result.rows });
+  // Map snake_case to camelCase for frontend
+  const data = result.rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    region: row.region,
+    startYear: row.start_year,
+    endYear: row.end_year,
+    description: row.description,
+    color: row.color,
+    tags: row.tags || [],
+    photoUrl: row.photo_url,
+    displayOrder: row.display_order,
+  }));
+  res.status(200).json({ success: true, data });
 }
 
 // Get events
 async function handleGetEvents(req, res) {
   const result = await pool.query('SELECT * FROM events ORDER BY start_year DESC');
-  res.status(200).json({ success: true, data: result.rows });
+  // Map snake_case to camelCase for frontend
+  const data = result.rows.map(row => ({
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    startYear: row.start_year,
+    endYear: row.end_year,
+    period: row.period,
+    civilizationId: row.civilization_id,
+    tags: row.tags || [],
+    photoUrl: row.photo_url,
+    color: row.color,
+  }));
+  res.status(200).json({ success: true, data });
 }
 
 // Get cell data
 async function handleGetCellData(req, res) {
   const result = await pool.query('SELECT * FROM cell_data');
-  res.status(200).json({ success: true, data: result.rows });
+  // Map snake_case to camelCase for frontend
+  const data = result.rows.map(row => ({
+    id: row.id,
+    year: row.year,
+    civilizationId: row.civilization_id,
+    photos: row.photos || [],
+    tags: row.tags || [],
+    notes: row.notes,
+    name: row.name,
+    relatedCells: row.related_cells || [],
+    events: [],
+  }));
+  res.status(200).json({ success: true, data });
 }
 
 // Get periods
