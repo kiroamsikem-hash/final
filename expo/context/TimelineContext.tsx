@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Civilization, PeriodEvent, YearRow, Cell, CellData, CellPhoto } from "@/types";
 import { initialCivilizations, initialEvents } from "@/data/initialData";
 import { databaseService } from "@/lib/database";
+import { io, Socket } from "socket.io-client";
 
 interface TimelineContextType {
   civilizations: Civilization[];
@@ -57,10 +58,27 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
   const [selectedEvent, setSelectedEvent] = useState<PeriodEvent | null>(null);
   const [selectedCivilization, setSelectedCivilization] = useState<Civilization | null>(null);
   const [selectedCell, setSelectedCell] = useState<Cell | null>(null);
+  const [socket, setSocket] = useState<Socket | null>(null);
 
-  // Real-time sync: Poll database every 5 seconds
+  // Real-time sync: WebSocket connection
   useEffect(() => {
-    const syncInterval = setInterval(async () => {
+    // Connect to WebSocket server (Nginx proxies /socket.io/ to port 8084)
+    const socketInstance = io({
+      path: '/socket.io/',
+      transports: ['websocket', 'polling'],
+    });
+
+    socketInstance.on('connect', () => {
+      console.log('✅ WebSocket connected');
+    });
+
+    socketInstance.on('disconnect', () => {
+      console.log('❌ WebSocket disconnected');
+    });
+
+    // Listen for data changes from server
+    socketInstance.on('dataChanged', async () => {
+      console.log('📥 Data changed - reloading from database');
       try {
         const [dbCivs, dbEvents, dbCellData] = await Promise.all([
           databaseService.getCivilizations(),
@@ -68,22 +86,25 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
           databaseService.getCellData()
         ]);
 
-        if (dbCivs && dbCivs.length > 0) {
+        if (dbCivs) {
           setCivilizations(dbCivs);
         }
-        if (dbEvents && dbEvents.length > 0) {
+        if (dbEvents) {
           setEvents(dbEvents);
         }
         if (dbCellData) {
           setCellData(dbCellData);
         }
       } catch (error) {
-        // Silently fail - database might be unavailable
-        console.debug("Sync failed:", error);
+        console.error('Failed to reload data:', error);
       }
-    }, 5000); // Poll every 5 seconds
+    });
 
-    return () => clearInterval(syncInterval);
+    setSocket(socketInstance);
+
+    return () => {
+      socketInstance.disconnect();
+    };
   }, []);
 
   useEffect(() => {
@@ -92,89 +113,30 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
 
   const loadInitialData = useCallback(async () => {
     try {
-      // Try to load from database first
-      try {
-        const [dbCivs, dbEvents, dbCellData] = await Promise.all([
-          databaseService.getCivilizations(),
-          databaseService.getEvents(),
-          databaseService.getCellData()
-        ]);
+      // ONLY use database - no AsyncStorage
+      const [dbCivs, dbEvents, dbCellData] = await Promise.all([
+        databaseService.getCivilizations(),
+        databaseService.getEvents(),
+        databaseService.getCellData()
+      ]);
 
-        if (dbCivs.length > 0 || dbEvents.length > 0) {
-          console.log("✅ Loaded data from MySQL database");
-          setCivilizations(dbCivs);
-          setEvents(dbEvents);
-          setCellData(dbCellData);
-          return;
-        }
-      } catch (dbError) {
-        console.warn("⚠️ Database not available, using local storage:", dbError);
-      }
-
-      // Fallback to AsyncStorage
-      const dataLoaded = await AsyncStorage.getItem(STORAGE_KEYS.dataLoaded);
-      
-      if (dataLoaded === "true") {
-        const storedCivs = await AsyncStorage.getItem(STORAGE_KEYS.civilizations);
-        const storedEvents = await AsyncStorage.getItem(STORAGE_KEYS.events);
-        const storedCellData = await AsyncStorage.getItem(STORAGE_KEYS.cellData);
-        
-        if (storedCivs) {
-          setCivilizations(JSON.parse(storedCivs));
-        }
-        if (storedEvents) {
-          setEvents(JSON.parse(storedEvents));
-        }
-        if (storedCellData) {
-          setCellData(JSON.parse(storedCellData));
-        }
-
-        // Sync to database if available
-        try {
-          if (storedCivs) await databaseService.syncCivilizations(JSON.parse(storedCivs));
-          if (storedEvents) await databaseService.syncEvents(JSON.parse(storedEvents));
-          if (storedCellData) await databaseService.syncCellData(JSON.parse(storedCellData));
-          console.log("✅ Synced local data to database");
-        } catch (syncError) {
-          console.warn("⚠️ Could not sync to database:", syncError);
-        }
-      } else {
-        // Load initial sample data
-        setCivilizations(initialCivilizations);
-        setEvents(initialEvents);
-        setCellData([]);
-        
-        await AsyncStorage.setItem(STORAGE_KEYS.civilizations, JSON.stringify(initialCivilizations));
-        await AsyncStorage.setItem(STORAGE_KEYS.events, JSON.stringify(initialEvents));
-        await AsyncStorage.setItem(STORAGE_KEYS.cellData, JSON.stringify([]));
-        await AsyncStorage.setItem(STORAGE_KEYS.dataLoaded, "true");
-
-        // Sync initial data to database
-        try {
-          await databaseService.syncCivilizations(initialCivilizations);
-          await databaseService.syncEvents(initialEvents);
-          console.log("✅ Synced initial data to database");
-        } catch (syncError) {
-          console.warn("⚠️ Could not sync initial data to database:", syncError);
-        }
-      }
+      console.log("✅ Loaded data from MySQL database");
+      setCivilizations(dbCivs || []);
+      setEvents(dbEvents || []);
+      setCellData(dbCellData || []);
     } catch (error) {
-      console.error("Error loading data:", error);
-      setCivilizations(initialCivilizations);
-      setEvents(initialEvents);
+      console.error("❌ Database error:", error);
+      // Show empty state if database fails
+      setCivilizations([]);
+      setEvents([]);
       setCellData([]);
     }
   }, []);
 
   const saveCivilizations = useCallback(async (civs: Civilization[]) => {
     try {
-      await AsyncStorage.setItem(STORAGE_KEYS.civilizations, JSON.stringify(civs));
-      // Sync to database
-      try {
-        await databaseService.syncCivilizations(civs);
-      } catch (dbError) {
-        console.warn("Could not sync civilizations to database:", dbError);
-      }
+      // ONLY save to database - no AsyncStorage
+      await databaseService.syncCivilizations(civs);
     } catch (error) {
       console.error("Error saving civilizations:", error);
     }
@@ -182,13 +144,8 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
 
   const saveEvents = useCallback(async (evts: PeriodEvent[]) => {
     try {
-      await AsyncStorage.setItem(STORAGE_KEYS.events, JSON.stringify(evts));
-      // Sync to database
-      try {
-        await databaseService.syncEvents(evts);
-      } catch (dbError) {
-        console.warn("Could not sync events to database:", dbError);
-      }
+      // ONLY save to database - no AsyncStorage
+      await databaseService.syncEvents(evts);
     } catch (error) {
       console.error("Error saving events:", error);
     }
@@ -196,13 +153,8 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
 
   const saveCellData = useCallback(async (data: CellData[]) => {
     try {
-      await AsyncStorage.setItem(STORAGE_KEYS.cellData, JSON.stringify(data));
-      // Sync to database
-      try {
-        await databaseService.syncCellData(data);
-      } catch (dbError) {
-        console.warn("Could not sync cell data to database:", dbError);
-      }
+      // ONLY save to database - no AsyncStorage
+      await databaseService.syncCellData(data);
     } catch (error) {
       console.error("Error saving cell data:", error);
     }
