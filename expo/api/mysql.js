@@ -228,6 +228,8 @@ async function handleRegister(req, res, data) {
 // Safe JSON parse helper
 function safeJSONParse(jsonString, defaultValue = []) {
   if (!jsonString) return defaultValue;
+  if (jsonString === '[]') return []; // Handle empty array string
+  if (typeof jsonString === 'object') return jsonString; // Already parsed
   try {
     return JSON.parse(jsonString);
   } catch (error) {
