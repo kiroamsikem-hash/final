@@ -276,7 +276,18 @@ async function handleGetCellData(req, res) {
 
 // Save civilization
 async function handleSaveCivilization(req, res, data) {
-  const { id, name, region, start_year, end_year, description, color, tags, photo_url } = data;
+  // Support both camelCase (frontend) and snake_case (database)
+  const { 
+    id, 
+    name, 
+    region, 
+    startYear, start_year = startYear,
+    endYear, end_year = endYear,
+    description, 
+    color, 
+    tags, 
+    photoUrl, photo_url = photoUrl 
+  } = data;
   
   await pool.execute(`
     INSERT INTO civilizations (id, name, region, start_year, end_year, description, color, tags, photo_url)
@@ -297,11 +308,23 @@ async function handleSaveCivilization(req, res, data) {
 
 // Save event
 async function handleSaveEvent(req, res, data) {
-  const { id, title, description, start_year, end_year, period, civilization_id, tags, photo_url } = data;
+  // Support both camelCase (frontend) and snake_case (database)
+  const { 
+    id, 
+    title, 
+    description, 
+    startYear, start_year = startYear,
+    endYear, end_year = endYear,
+    period, 
+    civilizationId, civilization_id = civilizationId,
+    tags, 
+    photoUrl, photo_url = photoUrl,
+    color
+  } = data;
   
   await pool.execute(`
-    INSERT INTO events (id, title, description, start_year, end_year, period, civilization_id, tags, photo_url)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO events (id, title, description, start_year, end_year, period, civilization_id, tags, photo_url, color)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
     title = VALUES(title),
     description = VALUES(description),
@@ -310,8 +333,9 @@ async function handleSaveEvent(req, res, data) {
     period = VALUES(period),
     civilization_id = VALUES(civilization_id),
     tags = VALUES(tags),
-    photo_url = VALUES(photo_url)
-  `, [id, title, description, start_year, end_year, period, civilization_id, JSON.stringify(tags || []), photo_url]);
+    photo_url = VALUES(photo_url),
+    color = VALUES(color)
+  `, [id, title, description, start_year, end_year, period, civilization_id, JSON.stringify(tags || []), photo_url, color || null]);
 
   res.status(200).json({ success: true });
 }
