@@ -369,9 +369,6 @@ async function handleSaveEvent(req, res, data) {
   res.status(200).json({ success: true });
 }
 
-  res.status(200).json({ success: true });
-}
-
 // Save cell data
 async function handleSaveCellData(req, res, data) {
   const { id, year, civilization_id, photos, tags, notes, name, related_cells } = data;
