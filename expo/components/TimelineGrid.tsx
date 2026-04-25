@@ -12,6 +12,7 @@ import {
 import { FileText, X, Trash2 } from "lucide-react-native";
 import { Civilization, PeriodEvent, Cell, CellData } from "@/types";
 import { useTimeline } from "@/context/TimelineContext";
+import { useSettings } from "@/context/SettingsContext";
 
 function civIndexToLetter(idx: number): string {
   let s = "";
@@ -180,6 +181,8 @@ export function TimelineGrid({
   searchQuery,
 }: TimelineGridProps) {
   const { removeCellPhoto, deleteEvent, clearCell } = useTimeline();
+  const { settings } = useSettings();
+  const labelOnRight = settings.eventLabelDirection === "right";
 
   const civIndex = useMemo(() => {
     const m = new Map<string, number>();
@@ -380,8 +383,30 @@ export function TimelineGrid({
               >
                 <View style={styles.eventBarGlow} pointerEvents="none" />
                 {showLabel && (
-                  <View style={styles.eventBarVerticalLabel}>
-                    <Text style={styles.eventBarVerticalText} numberOfLines={1} ellipsizeMode="tail">
+                  <View
+                    style={[
+                      styles.eventBarVerticalLabel,
+                      labelOnRight
+                        ? styles.eventBarVerticalLabelRight
+                        : styles.eventBarVerticalLabelLeft,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.eventBarVerticalText,
+                        { fontSize: settings.eventLabelFontSize },
+                        Platform.OS === "web"
+                          ? (({
+                              writingMode: labelOnRight ? "vertical-lr" : "vertical-rl",
+                              textOrientation: "mixed",
+                            } as any))
+                          : {
+                              transform: [{ rotate: labelOnRight ? "-90deg" : "90deg" }],
+                            },
+                      ]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
                       {p.event.title}
                     </Text>
                   </View>
@@ -422,6 +447,8 @@ export function TimelineGrid({
       removeCellPhoto,
       deleteEvent,
       clearCell,
+      labelOnRight,
+      settings.eventLabelFontSize,
     ]
   );
 
@@ -620,7 +647,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 5,
     bottom: 5,
-    left: 4,
     width: 16,
     backgroundColor: "rgba(2, 6, 23, 0.52)",
     borderRadius: 8,
@@ -629,19 +655,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.24)",
   },
+  eventBarVerticalLabelLeft: {
+    left: 4,
+  },
+  eventBarVerticalLabelRight: {
+    right: 4,
+  },
   eventBarVerticalText: {
     color: "#ffffff",
-    fontSize: 9,
     fontWeight: "800",
     letterSpacing: 0.2,
-    ...(Platform.OS === "web"
-      ? ({
-          writingMode: "vertical-rl",
-          textOrientation: "mixed",
-        } as any)
-      : {
-          transform: [{ rotate: "90deg" }],
-        }),
   },
   eventBarTag: {
     marginTop: 4,

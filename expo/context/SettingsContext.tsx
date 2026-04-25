@@ -16,6 +16,8 @@ const defaultSettings: TimelineSettings = {
   cellHeight: 60,
   cellWidth: 160,
   compactMode: false,
+  eventLabelDirection: "right",
+  eventLabelFontSize: 9,
 };
 
 interface SettingsContextType {

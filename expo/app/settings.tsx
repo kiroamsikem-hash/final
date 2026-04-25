@@ -231,6 +231,52 @@ export default function SettingsPage() {
           />
         </Section>
 
+        {/* Event Label */}
+        <Section title="Event Label" wide={isWideWeb}>
+          <View style={styles.stepGrid}>
+            <TouchableOpacity
+              style={[
+                styles.stepButton,
+                settings.eventLabelDirection === "left" && styles.stepButtonActive,
+              ]}
+              onPress={() => updateSettings({ eventLabelDirection: "left" })}
+            >
+              <Text
+                style={[
+                  styles.stepText,
+                  settings.eventLabelDirection === "left" && styles.stepTextActive,
+                ]}
+              >
+                Sola Baksin
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.stepButton,
+                settings.eventLabelDirection === "right" && styles.stepButtonActive,
+              ]}
+              onPress={() => updateSettings({ eventLabelDirection: "right" })}
+            >
+              <Text
+                style={[
+                  styles.stepText,
+                  settings.eventLabelDirection === "right" && styles.stepTextActive,
+                ]}
+              >
+                Saga Baksin
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <SliderControl
+            label="Yazi Boyutu"
+            value={settings.eventLabelFontSize}
+            min={8}
+            max={14}
+            step={1}
+            onChange={(v) => updateSettings({ eventLabelFontSize: v })}
+          />
+        </Section>
+
         <View style={styles.footer} />
       </ScrollView>
     </SafeAreaView>

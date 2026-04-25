@@ -77,6 +77,8 @@ export interface TimelineSettings {
   cellHeight: number;
   cellWidth: number;
   compactMode: boolean;
+  eventLabelDirection: "left" | "right";
+  eventLabelFontSize: number;
 }
 
 export const CIVILIZATION_COLORS = [
