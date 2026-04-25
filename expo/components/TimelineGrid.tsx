@@ -332,8 +332,9 @@ export function TimelineGrid({
             const slotWidth = (cellWidth - 6) / (p.totalSlots || 1);
             const left = 3 + p.slot * slotWidth;
             const width = Math.max(slotWidth - 3, 16);
-            const color = getPeriodColor(p.event.period);
-            const showLabel = p.height > 36 && width > 72;
+            const color = p.event.color || getPeriodColor(p.event.period);
+            const isNarrow = width < 84;
+            const showLabel = p.height > 30;
             const isEvtSel = selectedEvent?.id === p.event.id;
             return (
               <TouchableOpacity
@@ -344,7 +345,7 @@ export function TimelineGrid({
                 style={[
                   styles.eventBar,
                   {
-                    top: p.top + 2,
+                    top: p.top + 3,
                     height: Math.max(p.height - 4, 18),
                     left,
                     width,
@@ -354,10 +355,17 @@ export function TimelineGrid({
                 ]}
               >
                 <View style={styles.eventBarGlow} pointerEvents="none" />
-                {showLabel && (
+                {showLabel && !isNarrow && (
                   <Text style={styles.eventBarTitle} numberOfLines={1} ellipsizeMode="tail">
                     {p.event.title}
                   </Text>
+                )}
+                {showLabel && isNarrow && (
+                  <View style={styles.eventBarTitlePill}>
+                    <Text style={styles.eventBarTitlePillText} numberOfLines={1} ellipsizeMode="tail">
+                      {p.event.title}
+                    </Text>
+                  </View>
                 )}
                 {isEvtSel && (
                   <TouchableOpacity
@@ -575,8 +583,8 @@ const styles = StyleSheet.create({
   eventBar: {
     position: "absolute",
     borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 5,
     borderLeftWidth: 3,
     overflow: "hidden",
     shadowColor: "#000",
@@ -591,8 +599,26 @@ const styles = StyleSheet.create({
   },
   eventBarTitle: {
     color: "#fff",
-    fontSize: 10,
-    fontWeight: "700",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.2,
+  },
+  eventBarTitlePill: {
+    position: "absolute",
+    top: 2,
+    left: 2,
+    right: 2,
+    backgroundColor: "rgba(2, 6, 23, 0.7)",
+    borderRadius: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  eventBarTitlePillText: {
+    color: "#ffffff",
+    fontSize: 9,
+    fontWeight: "800",
     letterSpacing: 0.1,
   },
   eventBarTag: {
