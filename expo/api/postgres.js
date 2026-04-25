@@ -1,15 +1,16 @@
 // PostgreSQL API endpoint - MUCH BETTER for large data!
 const { Pool } = require('pg');
 
-// PostgreSQL connection
+// PostgreSQL connection - LOCAL DATABASE
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://admin:Kivi2020-@db.anatoliarchieve.info:6432/ana_veritabani',
-  ssl: {
-    rejectUnauthorized: false
-  },
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '5432'),
+  user: process.env.DB_USER || 'timeline_admin',
+  password: process.env.DB_PASSWORD || 'Timeline2024!Strong',
+  database: process.env.DB_NAME || 'timeline_pg',
   connectionTimeoutMillis: 10000,
   idleTimeoutMillis: 30000,
-  max: 5,
+  max: 10,
 });
 
 // Initialize database tables
@@ -44,7 +45,7 @@ async function initializeTables() {
       )
     `);
 
-    // Events table
+    // Events table (NO foreign key to prevent constraint errors)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS events (
         id VARCHAR(50) PRIMARY KEY,
@@ -57,12 +58,11 @@ async function initializeTables() {
         tags JSONB,
         photo_url TEXT,
         color VARCHAR(7),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (civilization_id) REFERENCES civilizations(id) ON DELETE CASCADE
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // Cell data table - JSONB for photos (handles large data!)
+    // Cell data table - JSONB for photos (handles large data!) - NO foreign key
     await pool.query(`
       CREATE TABLE IF NOT EXISTS cell_data (
         id VARCHAR(100) PRIMARY KEY,
@@ -73,8 +73,7 @@ async function initializeTables() {
         notes TEXT,
         name VARCHAR(100),
         related_cells JSONB,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (civilization_id) REFERENCES civilizations(id) ON DELETE CASCADE
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
@@ -142,6 +141,8 @@ async function handler(req, res) {
         return await handleDeleteCivilization(req, res, data);
       case 'deleteEvent':
         return await handleDeleteEvent(req, res, data);
+      case 'importSql':
+        return await handleImportSql(req, res, data);
       default:
         return res.status(400).json({ error: 'Invalid action' });
     }
@@ -273,6 +274,8 @@ async function handleSaveEvent(req, res, data) {
 // Save cell data - JSONB handles large photos!
 async function handleSaveCellData(req, res, data) {
   console.log('📥 Saving cell data to PostgreSQL');
+  console.log('📊 Data size:', JSON.stringify(data).length, 'bytes');
+  console.log('📸 Photos count:', data.photos?.length || 0);
   
   const { id, year, civilizationId, civilization_id, photos, tags, notes, name, relatedCells, related_cells } = data;
   
@@ -291,7 +294,7 @@ async function handleSaveCellData(req, res, data) {
       related_cells = EXCLUDED.related_cells
     `, [id, year, finalCivId, JSON.stringify(photos || []), JSON.stringify(tags || []), notes, name, JSON.stringify(finalRelatedCells || [])]);
     
-    console.log('✅ Cell data saved to PostgreSQL!');
+    console.log('✅ Cell data saved to PostgreSQL! ID:', id);
     res.status(200).json({ success: true });
   } catch (error) {
     console.error('❌ PostgreSQL save error:', error);
@@ -309,6 +312,49 @@ async function handleDeleteCivilization(req, res, data) {
 async function handleDeleteEvent(req, res, data) {
   await pool.query('DELETE FROM events WHERE id = $1', [data.id]);
   res.status(200).json({ success: true });
+}
+
+// Import raw SQL file content (admin/internal utility)
+async function handleImportSql(req, res, data) {
+  const sqlContent = data?.sqlContent;
+  if (!sqlContent || typeof sqlContent !== 'string') {
+    return res.status(400).json({ success: false, error: 'sqlContent is required' });
+  }
+
+  try {
+    // Remove multiline comments and normalize line comments.
+    const cleaned = sqlContent
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n')
+      .map((line) => line.replace(/--.*$/g, '').trim())
+      .filter(Boolean)
+      .join('\n');
+
+    const statements = cleaned
+      .split(';')
+      .map((stmt) => stmt.trim())
+      .filter(Boolean);
+
+    if (statements.length === 0) {
+      return res.status(400).json({ success: false, error: 'No executable SQL statements found' });
+    }
+
+    await pool.query('BEGIN');
+    for (const stmt of statements) {
+      await pool.query(stmt);
+    }
+    await pool.query('COMMIT');
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        executedStatements: statements.length,
+      },
+    });
+  } catch (error) {
+    await pool.query('ROLLBACK');
+    return res.status(500).json({ success: false, error: error.message });
+  }
 }
 
 module.exports = handler;

@@ -6,11 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
-  Dimensions,
+  Platform,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack } from "expo-router";
-import { ChevronLeft, RotateCcw, Save, Globe } from "lucide-react-native";
+import { ChevronLeft, RotateCcw } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 
 import { useSettings } from "../context/SettingsContext";
@@ -19,8 +20,6 @@ import { saveLanguage } from "../lib/i18n";
 import { showToast } from "../components/Toast";
 
 // Unique identifier: wa-chron-settings-2024
-
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const YEAR_STEPS = [1, 5, 10, 25, 50, 100, 200, 500];
 
@@ -31,7 +30,7 @@ const LANGUAGES = [
   { code: "de", name: "Deutsch", flag: "🇩🇪" },
 ];
 
-const DATE_FORMATS: Array<{ value: TimelineSettings["dateFormat"]; label: string }> = [
+const DATE_FORMATS: { value: TimelineSettings["dateFormat"]; label: string }[] = [
   { value: "BC", label: "BC (Before Christ)" },
   { value: "BCE", label: "BCE (Before Common Era)" },
   { value: "MO", label: "M.Ö. (Milattan Önce)" },
@@ -48,6 +47,8 @@ export default function SettingsPage() {
   const router = useRouter();
   const { settings, updateSettings, resetSettings } = useSettings();
   const { t, i18n } = useTranslation();
+  const { width: viewportWidth } = useWindowDimensions();
+  const isWideWeb = Platform.OS === "web" && viewportWidth >= 1200;
 
   const changeLanguage = useCallback(
     async (languageCode: string) => {
@@ -86,11 +87,11 @@ export default function SettingsPage() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, isWideWeb && styles.scrollContentWide]}
         showsVerticalScrollIndicator={false}
       >
         {/* Language Selection */}
-        <Section title={t("settings.language")}>
+        <Section title={t("settings.language")} wide={isWideWeb}>
           <View style={styles.languageGrid}>
             {LANGUAGES.map((lang) => {
               const isActive = i18n.language === lang.code;
@@ -111,7 +112,7 @@ export default function SettingsPage() {
         </Section>
 
         {/* Range Presets */}
-        <Section title={t("settings.display")}>
+        <Section title={t("settings.display")} wide={isWideWeb}>
           <View style={styles.presetGrid}>
             {RANGE_PRESETS.map((preset) => {
               const isActive =
@@ -133,7 +134,7 @@ export default function SettingsPage() {
         </Section>
 
         {/* Year Step */}
-        <Section title="Year Step">
+        <Section title="Year Step" wide={isWideWeb}>
           <View style={styles.stepGrid}>
             {YEAR_STEPS.map((step) => {
               const isActive = settings.yearStep === step;
@@ -153,7 +154,7 @@ export default function SettingsPage() {
         </Section>
 
         {/* Date Format */}
-        <Section title="Date Format">
+        <Section title="Date Format" wide={isWideWeb}>
           {DATE_FORMATS.map((format) => {
             const isActive = settings.dateFormat === format.value;
             return (
@@ -172,7 +173,7 @@ export default function SettingsPage() {
         </Section>
 
         {/* Display Options */}
-        <Section title={t("settings.display")}>
+        <Section title={t("settings.display")} wide={isWideWeb}>
           <Toggle
             label={t("settings.showGridLines") || "Show Grid Lines"}
             value={settings.showGridLines}
@@ -211,7 +212,7 @@ export default function SettingsPage() {
         </Section>
 
         {/* Cell Size */}
-        <Section title="Cell Size">
+        <Section title="Cell Size" wide={isWideWeb}>
           <SliderControl
             label="Height"
             value={settings.cellHeight}
@@ -236,9 +237,17 @@ export default function SettingsPage() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+  wide,
+}: {
+  title: string;
+  children: React.ReactNode;
+  wide?: boolean;
+}) {
   return (
-    <View style={styles.section}>
+    <View style={[styles.section, wide && styles.sectionWide]}>
       <Text style={styles.sectionTitle}>{title}</Text>
       {children}
     </View>
@@ -314,25 +323,25 @@ function SliderControl({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1a1a1a",
+    backgroundColor: "#0b1220",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
     paddingVertical: 12,
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#111827",
     borderBottomWidth: 1,
-    borderBottomColor: "#3a3a3a",
+    borderBottomColor: "#1f2937",
   },
   backButton: {
     padding: 4,
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: "700",
-    color: "#fff",
+    fontWeight: "800",
+    color: "#f8fafc",
   },
   resetButton: {
     padding: 4,
@@ -341,10 +350,28 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
+    padding: 18,
+  },
+  scrollContentWide: {
+    maxWidth: 1240,
+    width: "100%",
+    alignSelf: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 14,
+    alignItems: "flex-start",
   },
   section: {
-    marginBottom: 28,
+    marginBottom: 24,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: "#0f172a",
+    borderWidth: 1,
+    borderColor: "#1e293b",
+  },
+  sectionWide: {
+    width: "49%",
+    marginBottom: 14,
   },
   sectionTitle: {
     fontSize: 13,
@@ -362,17 +389,17 @@ const styles = StyleSheet.create({
   presetButton: {
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#111827",
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#3a3a3a",
+    borderColor: "#334155",
   },
   presetButtonActive: {
     backgroundColor: "rgba(201, 162, 39, 0.2)",
     borderColor: "#c9a227",
   },
   presetText: {
-    color: "#aaa",
+    color: "#cbd5e1",
     fontSize: 14,
     fontWeight: "500",
   },
@@ -390,10 +417,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#111827",
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#3a3a3a",
+    borderColor: "#334155",
     gap: 8,
   },
   languageButtonActive: {
@@ -404,7 +431,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   languageText: {
-    color: "#aaa",
+    color: "#cbd5e1",
     fontSize: 14,
     fontWeight: "500",
   },
@@ -420,10 +447,10 @@ const styles = StyleSheet.create({
   stepButton: {
     paddingHorizontal: 14,
     paddingVertical: 8,
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#111827",
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "#3a3a3a",
+    borderColor: "#334155",
     minWidth: 52,
     alignItems: "center",
   },
@@ -432,7 +459,7 @@ const styles = StyleSheet.create({
     borderColor: "#c9a227",
   },
   stepText: {
-    color: "#aaa",
+    color: "#cbd5e1",
     fontSize: 13,
     fontWeight: "500",
   },
@@ -445,14 +472,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#2a2a2a",
+    borderBottomColor: "#1f2937",
   },
   radioOuter: {
     width: 22,
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: "#555",
+    borderColor: "#475569",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -467,7 +494,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#c9a227",
   },
   formatText: {
-    color: "#fff",
+    color: "#f8fafc",
     fontSize: 15,
   },
   toggleRow: {
@@ -476,10 +503,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#2a2a2a",
+    borderBottomColor: "#1f2937",
   },
   toggleLabel: {
-    color: "#fff",
+    color: "#e2e8f0",
     fontSize: 15,
   },
   sliderControl: {
@@ -492,7 +519,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sliderLabel: {
-    color: "#aaa",
+    color: "#cbd5e1",
     fontSize: 14,
   },
   sliderValue: {
@@ -508,12 +535,12 @@ const styles = StyleSheet.create({
   sliderButton: {
     width: 32,
     height: 32,
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#111827",
     borderRadius: 6,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#3a3a3a",
+    borderColor: "#334155",
   },
   sliderButtonText: {
     color: "#c9a227",
@@ -523,7 +550,7 @@ const styles = StyleSheet.create({
   sliderTrack: {
     flex: 1,
     height: 6,
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#1f2937",
     borderRadius: 3,
     overflow: "hidden",
   },

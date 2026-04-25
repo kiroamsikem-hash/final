@@ -77,6 +77,63 @@ class DatabaseService {
     return await this.makeRequest('saveCellData', cellData);
   }
 
+  // Photo upload (file-based, not base64!)
+  async uploadPhoto(uri: string): Promise<string | null> {
+    try {
+      // Convert URI to blob
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      // Create FormData
+      const formData = new FormData();
+      formData.append('photo', blob, `photo-${Date.now()}.jpg`);
+      
+      // Upload to server
+      const uploadResponse = await fetch('/api/upload-photo', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error(`Upload failed: HTTP ${uploadResponse.status}`);
+      }
+      
+      const result = await uploadResponse.json();
+      
+      if (result.success && result.filename) {
+        console.log('✅ Photo uploaded:', result.filename);
+        return result.filename; // Return just the filename
+      }
+      
+      throw new Error('Upload failed: No filename returned');
+    } catch (error) {
+      console.error('❌ Photo upload error:', error);
+      return null;
+    }
+  }
+
+  async deletePhoto(filename: string): Promise<boolean> {
+    try {
+      const response = await fetch('/api/delete-photo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ filename }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Delete failed: HTTP ${response.status}`);
+      }
+      
+      const result = await response.json();
+      return result.success === true;
+    } catch (error) {
+      console.error('❌ Photo delete error:', error);
+      return false;
+    }
+  }
+
   // Bulk operations for initial data sync
   async syncCivilizations(civilizations: Civilization[]) {
     const promises = civilizations.map(civ => this.saveCivilization(civ));

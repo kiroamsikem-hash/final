@@ -11,7 +11,7 @@ interface ToastMessage {
 }
 
 let toastId = 0;
-const toastListeners: Array<(toast: ToastMessage) => void> = [];
+const toastListeners: ((toast: ToastMessage) => void)[] = [];
 
 export const toast = {
   success: (message: string) => {
@@ -30,6 +30,10 @@ export const toast = {
     toastListeners.forEach(listener => listener({ id, message, type: 'info' }));
   },
 };
+
+export function showToast(message: string, type: ToastType = 'info') {
+  toast[type](message);
+}
 
 export function ToastContainer() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -93,7 +97,7 @@ function ToastItem({ message, type }: ToastMessage) {
     }, 2800);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [fadeAnim, slideAnim]);
 
   const getIcon = () => {
     switch (type) {
@@ -149,7 +153,7 @@ function ToastItem({ message, type }: ToastMessage) {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 20,
+    top: 24,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -160,16 +164,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     marginBottom: 10,
-    minWidth: 300,
-    maxWidth: 500,
+    minWidth: 320,
+    maxWidth: 560,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.22,
     shadowRadius: 12,
   },
   message: {

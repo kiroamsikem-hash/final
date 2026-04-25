@@ -15,7 +15,7 @@ export function EventCard({ event, onPress, compact = false }: EventCardProps) {
 
   // Use event's custom color if available, otherwise use period color
   const backgroundColor = event.color 
-    ? `${event.color}dd` // Add alpha for transparency
+    ? event.color // Kullanıcının seçtiği renk direkt kullanılacak
     : getEventColor(event.period);
 
   if (compact) {
@@ -75,34 +75,28 @@ function getEventColor(period: string): string {
     "Other": "#708090",
   };
   
-  const baseColor = periodColors[period] || periodColors["Other"];
-  // Convert hex to rgba with 0.85 opacity
-  const hex = baseColor.replace('#', '');
-  const r = parseInt(hex.substring(0, 2), 16);
-  const g = parseInt(hex.substring(2, 4), 16);
-  const b = parseInt(hex.substring(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, 0.85)`;
+  return periodColors[period] || periodColors["Other"];
 }
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     marginVertical: 2,
-    minHeight: 32,
+    minHeight: 36,
     justifyContent: "center",
   },
   compactContainer: {
-    borderRadius: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     marginVertical: 1,
-    minHeight: 24,
+    minHeight: 28,
   },
   title: {
     color: "#fff",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "700",
     textShadowColor: "rgba(0, 0, 0, 0.3)",
     textShadowOffset: { width: 0, height: 1 },
@@ -110,12 +104,12 @@ const styles = StyleSheet.create({
   },
   compactTitle: {
     color: "#fff",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "600",
   },
   duration: {
     color: "rgba(255, 255, 255, 0.8)",
-    fontSize: 10,
+    fontSize: 9,
     marginTop: 2,
     fontWeight: "500",
   },
@@ -125,9 +119,9 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   tagBadge: {
-    backgroundColor: "rgba(255, 255, 255, 0.25)",
-    borderRadius: 3,
-    paddingHorizontal: 4,
+    backgroundColor: "rgba(15, 23, 42, 0.35)",
+    borderRadius: 4,
+    paddingHorizontal: 5,
     paddingVertical: 2,
     marginRight: 4,
   },

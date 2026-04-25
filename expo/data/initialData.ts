@@ -1,4 +1,4 @@
-import { Civilization, PeriodEvent, HistoricalPeriod } from "@/types";
+import { Civilization, PeriodEvent } from "@/types";
 
 export const initialCivilizations: Civilization[] = [
   {

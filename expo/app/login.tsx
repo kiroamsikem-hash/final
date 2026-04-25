@@ -9,17 +9,14 @@ import {
   Platform,
   KeyboardAvoidingView,
   ScrollView,
-  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Lock, User, Eye, EyeOff, Clock, Shield } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
-import { loginUser, authService } from "../lib/auth";
+import { authService } from "../lib/auth";
 import { LinearGradient } from "expo-linear-gradient";
 import { toast, ToastContainer } from "../components/Toast";
-
-const { width } = Dimensions.get("window");
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -73,7 +70,7 @@ export default function LoginScreen() {
     <View style={styles.container}>
       <ToastContainer />
       <LinearGradient
-        colors={["#0f0f10", "#1a1520", "#0f0f10"]}
+        colors={["#020617", "#0f172a", "#111827"]}
         style={styles.gradient}
       >
         <KeyboardAvoidingView
@@ -186,7 +183,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0f0f10",
+    backgroundColor: "#020617",
   },
   gradient: {
     flex: 1,
@@ -246,7 +243,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: "900",
-    color: "#fff",
+    color: "#f8fafc",
     letterSpacing: 1,
     textAlign: "center",
     marginBottom: 8,
@@ -280,7 +277,7 @@ const styles = StyleSheet.create({
   },
   labelText: {
     fontSize: 13,
-    color: "#999",
+    color: "#94a3b8",
     fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 0.5,
@@ -288,16 +285,16 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(26, 26, 29, 0.6)",
+    backgroundColor: "rgba(15, 23, 42, 0.72)",
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: "#2a2a2e",
+    borderColor: "#334155",
     paddingHorizontal: 18,
     height: 58,
   },
   input: {
     flex: 1,
-    color: "#fff",
+    color: "#e2e8f0",
     fontSize: 16,
     fontWeight: "500",
     ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : {}),
@@ -337,7 +334,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   footerText: {
-    color: "#555",
+    color: "#64748b",
     fontSize: 12,
     fontWeight: "600",
     letterSpacing: 0.5,

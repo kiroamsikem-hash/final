@@ -100,6 +100,7 @@ export function CellEditor({
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [availablePeriods, setAvailablePeriods] = useState<string[]>(SUGGESTED_PERIODS);
+  const periodScrollRef = React.useRef<ScrollView>(null);
 
   const cellData = useMemo(() => {
     if (!cell) return null;
@@ -121,6 +122,19 @@ export function CellEditor({
     );
   }, [cell, events]);
 
+  const resetEventForm = useCallback(() => {
+    setEventTitle("");
+    setEventDescription("");
+    setEventPeriod(""); // Bos baslasin, kullanici yazacak
+    setEventStartYear(cell ? String(Math.abs(cell.year)) : "");
+    setEventEndYear(cell ? String(Math.abs(cell.year)) : "");
+    setEventTags("");
+    setEventColor(undefined);
+    setShowEventForm(false);
+    setShowPeriodDropdown(false);
+    setShowColorPicker(false);
+  }, [cell]);
+
   // Load existing notes and cell name when cell changes or modal opens
   useEffect(() => {
     if (visible && cellData) {
@@ -131,9 +145,9 @@ export function CellEditor({
       setNewCellName("");
       resetEventForm();
     }
-  }, [visible, cellData]);
+  }, [visible, cellData, resetEventForm]);
 
-  // Load available periods from database
+  // Load available periods from database - SADECE KULLANILAN DÖNEMLER (varsayılan dönemler YOK!)
   useEffect(() => {
     const loadPeriods = async () => {
       try {
@@ -144,10 +158,15 @@ export function CellEditor({
         });
         const result = await response.json();
         if (result.success && result.data && result.data.length > 0) {
+          // SADECE veritabanından gelen dönemler (senin eklediğin)
           setAvailablePeriods(result.data);
+        } else {
+          // Hiç dönem yoksa boş liste
+          setAvailablePeriods([]);
         }
       } catch (error) {
         console.warn('Failed to load periods:', error);
+        setAvailablePeriods([]);
       }
     };
     if (visible) {
@@ -155,18 +174,91 @@ export function CellEditor({
     }
   }, [visible]);
 
-  const resetEventForm = () => {
-    setEventTitle("");
-    setEventDescription("");
-    setEventPeriod("Other");
-    setEventStartYear(cell ? String(Math.abs(cell.year)) : "");
-    setEventEndYear(cell ? String(Math.abs(cell.year)) : "");
-    setEventTags("");
-    setEventColor(undefined);
-    setShowEventForm(false);
-    setShowPeriodDropdown(false);
-    setShowColorPicker(false);
-  };
+  // Reload periods when dropdown opens - HER AÇILIŞTA YENİLE
+  const handleDropdownToggle = useCallback(async () => {
+    if (!showPeriodDropdown) {
+      // Dropdown açılıyor, dönemleri yeniden yükle
+      try {
+        const response = await fetch('/api/postgres', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'getPeriods' }),
+        });
+        const result = await response.json();
+        if (result.success && result.data && result.data.length > 0) {
+          // SADECE veritabanından gelen dönemler
+          setAvailablePeriods(result.data);
+        } else {
+          setAvailablePeriods([]);
+        }
+      } catch (error) {
+        console.warn('Failed to reload periods:', error);
+      }
+    }
+    setShowPeriodDropdown(!showPeriodDropdown);
+  }, [showPeriodDropdown]);
+
+  // Tarih scroll fonksiyonları
+  const handleYearScroll = useCallback((field: 'start' | 'end', direction: 'up' | 'down') => {
+    const currentValue = field === 'start' ? eventStartYear : eventEndYear;
+    const currentYear = parseInt(currentValue) || 0;
+    const newYear = direction === 'up' ? currentYear + 10 : currentYear - 10;
+    
+    if (field === 'start') {
+      setEventStartYear(String(Math.max(0, newYear)));
+    } else {
+      setEventEndYear(String(Math.max(0, newYear)));
+    }
+  }, [eventStartYear, eventEndYear]);
+
+  // Period dropdown scroll fonksiyonları
+  const handlePeriodScroll = useCallback((direction: 'up' | 'down') => {
+    if (periodScrollRef.current) {
+      periodScrollRef.current.scrollTo({
+        y: direction === 'down' ? 100 : -100,
+        animated: true,
+      });
+    }
+  }, []);
+
+  const handleDeletePeriod = useCallback(async (period: string) => {
+    Alert.alert(
+      "Dönemi Sil",
+      `"${period}" dönemini ve bu döneme ait TÜM olayları silmek istediğinize emin misiniz?`,
+      [
+        { text: "İptal", style: "cancel" },
+        {
+          text: "Sil",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // Bu döneme ait tüm olayları sil
+              const eventsToDelete = events.filter(e => e.period === period);
+              for (const event of eventsToDelete) {
+                await timelineCtx.deleteEvent(event.id);
+              }
+              
+              // Dönemleri yeniden yükle
+              const response = await fetch('/api/postgres', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'getPeriods' }),
+              });
+              const result = await response.json();
+              if (result.success && result.data) {
+                setAvailablePeriods(result.data.length > 0 ? result.data : SUGGESTED_PERIODS);
+              }
+              
+              Alert.alert("Başarılı", `"${period}" dönemi ve ${eventsToDelete.length} olay silindi.`);
+            } catch (error) {
+              console.error('Failed to delete period:', error);
+              Alert.alert("Hata", "Dönem silinirken bir hata oluştu.");
+            }
+          }
+        }
+      ]
+    );
+  }, [events, timelineCtx]);
 
   const formatYear = (year: number): string => {
     return `${Math.abs(year)} BC`;
@@ -324,7 +416,7 @@ export function CellEditor({
     timelineCtx.addEvent(newEvent);
     resetEventForm();
     Alert.alert("Success", "Event added successfully!");
-  }, [cell, civilization, eventTitle, eventDescription, eventPeriod, eventStartYear, eventEndYear, eventTags, timelineCtx]);
+  }, [cell, civilization, eventTitle, eventDescription, eventPeriod, eventStartYear, eventEndYear, eventTags, eventColor, timelineCtx, resetEventForm]);
 
   const renderTabButton = (
     tab: "events" | "photos" | "tags" | "notes" | "related" | "name",
@@ -346,30 +438,36 @@ export function CellEditor({
     <View style={styles.eventFormOverlay}>
       <View style={styles.eventFormContainer}>
         <View style={styles.eventFormHeader}>
-          <Text style={styles.eventFormTitle}>Add New Event</Text>
+          <Text style={styles.eventFormTitle}>📅 Yeni Olay Ekle</Text>
           <TouchableOpacity onPress={() => setShowEventForm(false)} style={styles.closeButton}>
             <X size={24} color="#fff" />
           </TouchableOpacity>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} style={styles.eventFormScroll}>
+        <ScrollView 
+          showsVerticalScrollIndicator={false} 
+          style={styles.eventFormScroll}
+          contentContainerStyle={styles.eventFormScrollContent}
+        >
+          {/* Olay Başlığı */}
           <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Event Title *</Text>
+            <Text style={styles.formLabel}>📝 Olay Başlığı *</Text>
             <TextInput
               style={styles.formInput}
-              placeholder="Enter event title..."
-              placeholderTextColor="#666"
+              placeholder="Örn: Truva Savaşı, Lidya'nın Kuruluşu..."
+              placeholderTextColor="#999"
               value={eventTitle}
               onChangeText={setEventTitle}
             />
           </View>
 
+          {/* Açıklama */}
           <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Description</Text>
+            <Text style={styles.formLabel}>📄 Açıklama</Text>
             <TextInput
               style={[styles.formInput, styles.formTextArea]}
-              placeholder="Enter description..."
-              placeholderTextColor="#666"
+              placeholder="Olay hakkında detaylı bilgi..."
+              placeholderTextColor="#999"
               value={eventDescription}
               onChangeText={setEventDescription}
               multiline
@@ -378,80 +476,163 @@ export function CellEditor({
             />
           </View>
 
+          {/* Tarih Aralığı */}
           <View style={styles.formRow}>
-            <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.formLabel}>Start Year (BC) *</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="e.g. 1500"
-                placeholderTextColor="#666"
-                value={eventStartYear}
-                onChangeText={setEventStartYear}
-                keyboardType="number-pad"
-              />
+            <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+              <Text style={styles.formLabel}>📆 Başlangıç (MÖ) *</Text>
+              <View style={styles.yearInputContainer}>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Örn: 1500"
+                  placeholderTextColor="#999"
+                  value={eventStartYear}
+                  onChangeText={setEventStartYear}
+                  keyboardType="number-pad"
+                />
+                <View style={styles.yearScrollButtons}>
+                  <TouchableOpacity
+                    style={styles.yearScrollButton}
+                    onPress={() => handleYearScroll('start', 'up')}
+                  >
+                    <Text style={styles.yearScrollButtonText}>▲</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.yearScrollButton}
+                    onPress={() => handleYearScroll('start', 'down')}
+                  >
+                    <Text style={styles.yearScrollButtonText}>▼</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
-            <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.formLabel}>End Year (BC) *</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="e.g. 1400"
-                placeholderTextColor="#666"
-                value={eventEndYear}
-                onChangeText={setEventEndYear}
-                keyboardType="number-pad"
-              />
+            <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+              <Text style={styles.formLabel}>📆 Bitiş (MÖ) *</Text>
+              <View style={styles.yearInputContainer}>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Örn: 1400"
+                  placeholderTextColor="#999"
+                  value={eventEndYear}
+                  onChangeText={setEventEndYear}
+                  keyboardType="number-pad"
+                />
+                <View style={styles.yearScrollButtons}>
+                  <TouchableOpacity
+                    style={styles.yearScrollButton}
+                    onPress={() => handleYearScroll('end', 'up')}
+                  >
+                    <Text style={styles.yearScrollButtonText}>▲</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.yearScrollButton}
+                    onPress={() => handleYearScroll('end', 'down')}
+                  >
+                    <Text style={styles.yearScrollButtonText}>▼</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
           </View>
 
+          {/* Dönem */}
           <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Historical Period</Text>
+            <Text style={styles.formLabel}>🏛️ Tarihsel Dönem</Text>
             <TouchableOpacity
               style={styles.dropdownButton}
-              onPress={() => setShowPeriodDropdown(!showPeriodDropdown)}
+              onPress={handleDropdownToggle}
             >
               <Text style={styles.dropdownButtonText}>{eventPeriod}</Text>
               <ChevronDown size={18} color="#888" />
             </TouchableOpacity>
             {showPeriodDropdown && (
-              <View style={styles.dropdownMenu}>
-                {availablePeriods.map((period) => (
+              <View style={styles.dropdownMenuContainer}>
+                <View style={styles.dropdownScrollButtons}>
                   <TouchableOpacity
-                    key={period}
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setEventPeriod(period);
-                      setShowPeriodDropdown(false);
-                    }}
+                    style={styles.dropdownScrollButton}
+                    onPress={() => handlePeriodScroll('up')}
                   >
-                    <View style={[styles.periodDot, { backgroundColor: getPeriodColor(period) }]} />
-                    <Text style={[styles.dropdownItemText, eventPeriod === period && styles.dropdownItemTextActive]}>
-                      {period}
-                    </Text>
+                    <Text style={styles.dropdownScrollButtonText}>▲</Text>
                   </TouchableOpacity>
-                ))}
+                  <TouchableOpacity
+                    style={styles.dropdownScrollButton}
+                    onPress={() => handlePeriodScroll('down')}
+                  >
+                    <Text style={styles.dropdownScrollButtonText}>▼</Text>
+                  </TouchableOpacity>
+                </View>
+                <ScrollView 
+                  ref={periodScrollRef}
+                  style={styles.dropdownMenu}
+                  nestedScrollEnabled={true}
+                >
+                  {availablePeriods.length > 0 ? (
+                    availablePeriods.map((period) => (
+                      <View key={period} style={styles.dropdownItemContainer}>
+                        <TouchableOpacity
+                          style={styles.dropdownItem}
+                          onPress={() => {
+                            setEventPeriod(period);
+                            setShowPeriodDropdown(false);
+                          }}
+                        >
+                          <View style={[styles.periodDot, { backgroundColor: getPeriodColor(period) }]} />
+                          <Text style={[styles.dropdownItemText, eventPeriod === period && styles.dropdownItemTextActive]}>
+                            {period}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.deletePeriodButton}
+                          onPress={() => handleDeletePeriod(period)}
+                        >
+                          <Trash2 size={16} color="#dc143c" />
+                        </TouchableOpacity>
+                      </View>
+                    ))
+                  ) : (
+                    <View style={styles.emptyPeriodsContainer}>
+                      <Text style={styles.emptyPeriodsText}>
+                        Henüz dönem yok. Aşağıya yeni dönem adı yazın.
+                      </Text>
+                    </View>
+                  )}
+                </ScrollView>
               </View>
             )}
+            
+            {/* Manuel dönem girişi */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>✏️ Veya Yeni Dönem Yazın</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="Örn: Lidya Dönemi, Hitit İmparatorluğu..."
+                placeholderTextColor="#999"
+                value={eventPeriod}
+                onChangeText={setEventPeriod}
+              />
+            </View>
           </View>
 
+          {/* Etiketler */}
           <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Tags (comma separated)</Text>
+            <Text style={styles.formLabel}>🏷️ Etiketler (virgülle ayırın)</Text>
             <TextInput
               style={styles.formInput}
-              placeholder="e.g. war, art, trade"
-              placeholderTextColor="#666"
+              placeholder="Örn: savaş, sanat, ticaret"
+              placeholderTextColor="#999"
               value={eventTags}
               onChangeText={setEventTags}
             />
           </View>
 
+          {/* Renk Seçimi */}
           <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Event Rengi (Opsiyonel)</Text>
+            <Text style={styles.formLabel}>🎨 Olay Rengi (Opsiyonel)</Text>
             <TouchableOpacity
               style={[styles.colorPreviewButton, eventColor && { backgroundColor: eventColor }]}
               onPress={() => setShowColorPicker(!showColorPicker)}
             >
-              <Text style={styles.colorPreviewText}>
-                {eventColor ? "Renk Seçildi" : "Renk Seç"}
+              <Text style={[styles.colorPreviewText, eventColor && { color: '#fff' }]}>
+                {eventColor ? "✓ Renk Seçildi" : "Renk Seç"}
               </Text>
             </TouchableOpacity>
             {showColorPicker && (
@@ -485,9 +666,10 @@ export function CellEditor({
             )}
           </View>
 
+          {/* Oluştur Butonu */}
           <TouchableOpacity style={styles.createEventButton} onPress={handleCreateEvent}>
             <Plus size={20} color="#fff" />
-            <Text style={styles.createEventButtonText}>Create Event</Text>
+            <Text style={styles.createEventButtonText}>Olay Oluştur</Text>
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -697,33 +879,11 @@ export function CellEditor({
       />
       
       <Text style={styles.cellNameHint}>
-        Örnek: "Saray Dönemi", "Ticaret Merkezi", "Kültürel Gelişim"
+        Ornek: Saray Donemi, Ticaret Merkezi, Kulturel Gelisim
         {"\n\n"}Bu ad, ilişkili hücreler listesinde görünecek ve hücreyi tanımlamak için kullanılacak.
       </Text>
     </View>
   );
-
-  const getCellLabel = useCallback((year: number, civId: string): string => {
-    const civIdx = civilizations.findIndex(c => c.id === civId);
-    if (civIdx === -1) return "?";
-    
-    // Convert index to letter (A, B, C, ...)
-    let letter = "";
-    let n = civIdx;
-    do {
-      letter = String.fromCharCode(65 + (n % 26)) + letter;
-      n = Math.floor(n / 26) - 1;
-    } while (n >= 0);
-    
-    // Row number is based on year position (simplified)
-    const rowNum = Math.abs(year);
-    return `${letter}${rowNum}`;
-  }, [civilizations]);
-
-  // Generate available cells with custom names - basitleştirildi
-  const availableCells = useMemo(() => {
-    return []; // Artık kullanmıyoruz
-  }, []);
 
   const handleAddRelatedCell = useCallback(() => {
     if (!cell || !selectedRelatedCell.trim()) {
@@ -931,7 +1091,7 @@ export function CellEditor({
           <Link2 size={56} color="#444" strokeWidth={1.5} />
           <Text style={styles.emptyText}>İlişkili hücre yok</Text>
           <Text style={styles.emptySubtext}>
-            Bu hücreyle ilişkili diğer hücreleri eklemek için yukarıdaki "Ekle" butonuna tıklayın.
+            Bu hucreyle iliskili diger hucreleri eklemek icin yukaridaki Ekle butonuna tiklayin.
             {"\n"}
             Örnek: Minoan A1 hücresini Mycenaean B3 ile ilişkilendirebilirsiniz.
           </Text>
@@ -1046,23 +1206,23 @@ function getPeriodColor(period: string): string {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    justifyContent: "flex-end",
+    justifyContent: "center",
+    alignItems: "center",
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    backgroundColor: "rgba(2, 6, 23, 0.72)",
   },
   panel: {
-    backgroundColor: "#1a1a1a",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: Platform.OS === "web" ? SCREEN_HEIGHT * 0.9 : SCREEN_HEIGHT * 0.85,
-    minHeight: Platform.OS === "web" ? 600 : 400,
+    backgroundColor: "#0f172a",
+    borderRadius: 12,
+    width: Platform.OS === "web" ? SCREEN_WIDTH * 0.95 : SCREEN_WIDTH * 0.95,
+    height: Platform.OS === "web" ? SCREEN_HEIGHT * 0.95 : SCREEN_HEIGHT * 0.95,
   },
   handle: {
     width: 40,
     height: 4,
-    backgroundColor: "#444",
+    backgroundColor: "#475569",
     borderRadius: 2,
     alignSelf: "center",
     marginTop: 12,
@@ -1075,7 +1235,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#333",
+    borderBottomColor: "#1e293b",
   },
   headerInfo: {
     flex: 1,
@@ -1093,7 +1253,7 @@ const styles = StyleSheet.create({
   civName: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#fff",
+    color: "#f8fafc",
   },
   headerBottom: {
     flexDirection: "row",
@@ -1107,7 +1267,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   closeButton: {
-    padding: 4,
+    padding: 6,
+    borderRadius: 10,
+    backgroundColor: "rgba(148,163,184,0.12)",
   },
   tabs: {
     flexDirection: "row",
@@ -1115,9 +1277,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 6,
     borderBottomWidth: 1,
-    borderBottomColor: "#333",
+    borderBottomColor: "#1e293b",
     flexWrap: "wrap",
-    backgroundColor: "#1a1a1a",
+    backgroundColor: "#0f172a",
   },
   tabButton: {
     flexDirection: "row",
@@ -1127,7 +1289,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: 8,
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#111827",
     minWidth: Platform.OS === "web" ? 110 : "auto",
   },
   tabButtonActive: {
@@ -1136,7 +1298,7 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#888",
+    color: "#94a3b8",
   },
   tabTextActive: {
     color: "#c9a227",
@@ -1159,7 +1321,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#fff",
+    color: "#f8fafc",
   },
   addButton: {
     flexDirection: "row",
@@ -1205,7 +1367,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   eventCard: {
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#111827",
     borderRadius: 12,
     padding: 14,
     borderLeftWidth: 3,
@@ -1230,12 +1392,12 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#fff",
+    color: "#f8fafc",
     flex: 1,
   },
   eventDescription: {
     fontSize: 13,
-    color: "#aaa",
+    color: "#cbd5e1",
     lineHeight: 18,
     marginBottom: 10,
   },
@@ -1246,7 +1408,7 @@ const styles = StyleSheet.create({
   },
   eventMetaText: {
     fontSize: 12,
-    color: "#888",
+    color: "#94a3b8",
   },
   eventTagsContainer: {
     flexDirection: "row",
@@ -1255,7 +1417,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   eventTagBadge: {
-    backgroundColor: "#3a3a3a",
+    backgroundColor: "#1e293b",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 4,
@@ -1274,12 +1436,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#666",
+    color: "#94a3b8",
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
-    color: "#555",
+    color: "#64748b",
     textAlign: "center",
     marginTop: 8,
     paddingHorizontal: 30,
@@ -1294,7 +1456,7 @@ const styles = StyleSheet.create({
     width: (SCREEN_WIDTH - 64) / 2,
     borderRadius: 12,
     overflow: "hidden",
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#111827",
   },
   photoImage: {
     width: "100%",
@@ -1319,7 +1481,7 @@ const styles = StyleSheet.create({
   },
   tagInput: {
     flex: 1,
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#111827",
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -1352,7 +1514,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   notesInput: {
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#111827",
     borderRadius: 12,
     padding: 16,
     color: "#fff",
@@ -1362,7 +1524,7 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   cellNameInput: {
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#111827",
     borderRadius: 12,
     padding: 16,
     color: "#fff",
@@ -1381,15 +1543,16 @@ const styles = StyleSheet.create({
   // Event Form Styles
   eventFormOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
-    justifyContent: "flex-end",
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
+    justifyContent: "center",
+    alignItems: "center",
     zIndex: 100,
   },
   eventFormContainer: {
-    backgroundColor: "#1a1a1a",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: SCREEN_HEIGHT * 0.85,
+    backgroundColor: "#0f172a",
+    borderRadius: 12,
+    width: Platform.OS === "web" ? SCREEN_WIDTH * 0.9 : SCREEN_WIDTH * 0.95,
+    height: Platform.OS === "web" ? SCREEN_HEIGHT * 0.9 : SCREEN_HEIGHT * 0.95,
     paddingBottom: Platform.OS === "ios" ? 34 : 20,
   },
   eventFormHeader: {
@@ -1398,7 +1561,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#333",
+    borderBottomColor: "#1e293b",
   },
   eventFormTitle: {
     fontSize: 20,
@@ -1407,7 +1570,10 @@ const styles = StyleSheet.create({
   },
   eventFormScroll: {
     flex: 1,
+  },
+  eventFormScrollContent: {
     padding: 20,
+    paddingTop: 10,
   },
   formGroup: {
     marginBottom: 16,
@@ -1419,18 +1585,44 @@ const styles = StyleSheet.create({
   formLabel: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#aaa",
+    color: "#e2e8f0",
     marginBottom: 8,
   },
   formInput: {
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#111827",
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
     color: "#fff",
     fontSize: 15,
+    borderWidth: 2,
+    borderColor: "#334155",
+    minHeight: 44,
+  },
+  yearInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  yearScrollButtons: {
+    flexDirection: "column",
+    gap: 4,
+  },
+  yearScrollButton: {
+    width: 28,
+    height: 20,
+    borderRadius: 6,
+    backgroundColor: "#1f2937",
     borderWidth: 1,
-    borderColor: "#3a3a3a",
+    borderColor: "#334155",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  yearScrollButtonText: {
+    color: "#c9a227",
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 14,
   },
   formHint: {
     fontSize: 12,
@@ -1445,7 +1637,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   dropdownButton: {
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#111827",
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -1453,19 +1645,45 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#3a3a3a",
+    borderColor: "#334155",
   },
   dropdownButtonText: {
     color: "#fff",
     fontSize: 15,
   },
   dropdownMenu: {
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#111827",
     borderRadius: 10,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: "#3a3a3a",
-    overflow: "hidden",
+    borderColor: "#334155",
+    maxHeight: 200,
+  },
+  dropdownMenuContainer: {
+    position: "relative",
+  },
+  dropdownScrollButtons: {
+    position: "absolute",
+    right: 8,
+    top: 16,
+    zIndex: 10,
+    flexDirection: "column",
+    gap: 4,
+  },
+  dropdownScrollButton: {
+    backgroundColor: "#1f2937",
+    borderRadius: 6,
+    width: 32,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#334155",
+  },
+  dropdownScrollButtonText: {
+    color: "#c9a227",
+    fontSize: 16,
+    fontWeight: "700",
   },
   dropdownItem: {
     flexDirection: "row",
@@ -1475,6 +1693,25 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#333",
+    flex: 1,
+  },
+  dropdownItemContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  deletePeriodButton: {
+    padding: 8,
+    marginRight: 8,
+  },
+  emptyPeriodsContainer: {
+    padding: 20,
+    alignItems: "center",
+  },
+  emptyPeriodsText: {
+    color: "#888",
+    fontSize: 14,
+    textAlign: "center",
   },
   dropdownItemText: {
     color: "#aaa",
@@ -1508,11 +1745,11 @@ const styles = StyleSheet.create({
   colorPreviewButton: {
     height: 48,
     borderRadius: 8,
-    backgroundColor: "#3a3a3a",
+    backgroundColor: "#111827",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#555",
+    borderColor: "#334155",
   },
   colorPreviewText: {
     color: "#fff",
@@ -1520,12 +1757,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   colorPickerContainer: {
-    backgroundColor: "#3a3a3a",
+    backgroundColor: "#111827",
     borderRadius: 8,
     padding: 12,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: "#555",
+    borderColor: "#334155",
   },
   colorPalette: {
     flexDirection: "row",
@@ -1561,7 +1798,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   relatedCellCard: {
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#111827",
     borderRadius: 12,
     padding: 14,
     borderLeftWidth: 3,
@@ -1611,7 +1848,7 @@ const styles = StyleSheet.create({
   },
   relatedCellNote: {
     fontSize: 13,
-    color: "#aaa",
+    color: "#cbd5e1",
     lineHeight: 18,
   },
   relatedCellDelete: {
@@ -1632,13 +1869,13 @@ const styles = StyleSheet.create({
   relatedCellPhoto: {
     width: 70,
     height: 70,
-    backgroundColor: "#3a3a3a",
+    backgroundColor: "#1f2937",
   },
   relatedCellPhotoMore: {
     width: 70,
     height: 70,
     borderRadius: 8,
-    backgroundColor: "#3a3a3a",
+    backgroundColor: "#1f2937",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
@@ -1656,7 +1893,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: "#333",
+    borderTopColor: "#1f2937",
     flexWrap: "wrap",
   },
   relatedCellFooterText: {

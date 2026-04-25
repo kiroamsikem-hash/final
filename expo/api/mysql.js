@@ -234,7 +234,7 @@ function safeJSONParse(jsonString, defaultValue = []) {
   if (typeof jsonString === 'object') return jsonString; // Already parsed
   try {
     return JSON.parse(jsonString);
-  } catch (error) {
+  } catch (_error) {
     console.warn('⚠️ Invalid JSON, returning default:', jsonString);
     return defaultValue;
   }

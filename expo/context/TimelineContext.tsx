@@ -42,7 +42,7 @@ const TimelineContext = createContext<TimelineContextType | undefined>(undefined
 export function TimelineProvider({ children }: { children: React.ReactNode }) {
   const [civilizations, setCivilizations] = useState<Civilization[]>([]);
   const [events, setEvents] = useState<PeriodEvent[]>([]);
-  const [yearRows, setYearRows] = useState<YearRow[]>([]);
+  const [yearRows] = useState<YearRow[]>([]);
   const [cellData, setCellData] = useState<CellData[]>([]);
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<PeriodEvent | null>(null);
@@ -80,10 +80,6 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(pollInterval);
   }, []);
 
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-
   const loadInitialData = useCallback(async () => {
     try {
       const [dbCivs, dbEvents, dbCellData] = await Promise.all([
@@ -101,6 +97,10 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
       setCellData([]);
     }
   }, []);
+
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
 
   // Save a single civilization directly (faster than syncing all)
   const saveSingleCivilization = useCallback(async (civ: Civilization) => {

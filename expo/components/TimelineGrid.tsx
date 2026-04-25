@@ -236,12 +236,6 @@ export function TimelineGrid({
             const rT = rowTops[i];
             const photos = data?.photos || [];
             const cellLabel = `${colLetter}${i + 1}`;
-            const cellEvents = placements.filter(p => {
-              const rowTopPx = rT;
-              const rowBottomPx = rT + rH;
-              return p.top < rowBottomPx && p.top + p.height > rowTopPx && Math.abs(p.event.startYear - p.event.endYear) < 1;
-            });
-
             const perRow = 2;
             const gap = 3;
             const photoSize = Math.max(40, (cellWidth - 14) / perRow);
@@ -339,7 +333,7 @@ export function TimelineGrid({
             const left = 3 + p.slot * slotWidth;
             const width = Math.max(slotWidth - 3, 16);
             const color = getPeriodColor(p.event.period);
-            const showLabel = p.height > 36;
+            const showLabel = p.height > 36 && width > 72;
             const isEvtSel = selectedEvent?.id === p.event.id;
             return (
               <TouchableOpacity
@@ -361,7 +355,7 @@ export function TimelineGrid({
               >
                 <View style={styles.eventBarGlow} pointerEvents="none" />
                 {showLabel && (
-                  <Text style={styles.eventBarTitle} numberOfLines={2}>
+                  <Text style={styles.eventBarTitle} numberOfLines={1} ellipsizeMode="tail">
                     {p.event.title}
                   </Text>
                 )}
@@ -387,7 +381,6 @@ export function TimelineGrid({
       cellWidth,
       totalHeight,
       years,
-      cellHeight,
       selectedRow,
       selectedCell,
       selectedEvent,
@@ -419,7 +412,7 @@ const styles = StyleSheet.create({
   civColumn: {
     position: "relative",
     borderRightWidth: 1,
-    borderRightColor: "#2a2a2a",
+    borderRightColor: "#1f2937",
   },
   cellBg: {
     position: "absolute",
@@ -427,10 +420,10 @@ const styles = StyleSheet.create({
   },
   cellBgBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: "#242424",
+    borderBottomColor: "#1f2937",
   },
   rowHighlight: {
-    backgroundColor: "rgba(201, 162, 39, 0.08)",
+    backgroundColor: "rgba(201, 162, 39, 0.11)",
   },
   cellSelBorder: {
     position: "absolute",
@@ -493,9 +486,9 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   photoTile: {
-    borderRadius: 4,
+    borderRadius: 6,
     overflow: "hidden",
-    backgroundColor: "#222",
+    backgroundColor: "#0f172a",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
   },
@@ -527,7 +520,7 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   tagMini: {
-    backgroundColor: "rgba(201,162,39,0.22)",
+    backgroundColor: "rgba(201,162,39,0.28)",
     borderRadius: 3,
     paddingHorizontal: 4,
     paddingVertical: 1,
@@ -581,14 +574,14 @@ const styles = StyleSheet.create({
   },
   eventBar: {
     position: "absolute",
-    borderRadius: 6,
+    borderRadius: 8,
     paddingHorizontal: 6,
     paddingVertical: 4,
     borderLeftWidth: 3,
     overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.4,
     shadowRadius: 4,
     elevation: 4,
   },

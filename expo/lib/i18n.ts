@@ -1,4 +1,4 @@
-import i18n from 'i18next';
+import { createInstance } from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -16,6 +16,8 @@ const resources = {
   fr: { translation: fr },
   de: { translation: de },
 };
+
+const i18n = createInstance();
 
 // Kaydedilmiş dili yükle
 const loadLanguage = async () => {
@@ -47,7 +49,7 @@ const initI18n = async () => {
       resources,
       lng: savedLanguage,
       fallbackLng: 'tr',
-      compatibilityJSON: 'v3',
+      compatibilityJSON: 'v4',
       interpolation: {
         escapeValue: false,
       },

@@ -5,11 +5,11 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
   TextInput,
   Pressable,
   Animated,
   Platform,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -27,6 +27,7 @@ import {
   Sparkles,
   Trash2,
   Upload,
+  Database,
   GripVertical,
   FileText,
   LogOut,
@@ -47,11 +48,15 @@ import {
   Cell,
 } from "../types";
 
-const { height: SCREEN_H } = Dimensions.get("window");
-
-// Dynamic period filter - shows all unique periods from events
-const PERIODS: { id: string | null; label: string; color: string }[] = [
-  { id: null, label: "All", color: "#c9a227" },
+const PERIOD_PALETTE = [
+  "#c9a227",
+  "#4682B4",
+  "#8B4513",
+  "#5F9EA0",
+  "#CD853F",
+  "#6495ED",
+  "#708090",
+  "#8B0000",
 ];
 
 export default function TimelineScreen() {
@@ -72,6 +77,8 @@ export default function TimelineScreen() {
   const [fabOpen, setFabOpen] = useState<boolean>(false);
   const [reorderMode, setReorderMode] = useState<boolean>(false);
   const [showScrollTop, setShowScrollTop] = useState<boolean>(false);
+  const { width: viewportWidth } = useWindowDimensions();
+  const isCompactWeb = Platform.OS === "web" && viewportWidth < 1280;
 
   const pulseAnim = useRef(new Animated.Value(0)).current;
 
@@ -93,6 +100,19 @@ export default function TimelineScreen() {
   }, [pulseAnim]);
 
   const yearsList = useMemo(() => settingsCtx.getYearsList(), [settingsCtx]);
+  const periodOptions = useMemo(() => {
+    const uniquePeriods = Array.from(
+      new Set(timelineCtx.events.map((event) => event.period?.trim()).filter(Boolean))
+    );
+    const dynamic = uniquePeriods
+      .sort((a, b) => a.localeCompare(b))
+      .map((period, idx) => ({
+        id: period,
+        label: period,
+        color: PERIOD_PALETTE[idx % PERIOD_PALETTE.length],
+      }));
+    return [{ id: null, label: "All", color: "#c9a227" }, ...dynamic];
+  }, [timelineCtx.events]);
 
   const handleZoomIn = useCallback(() => {
     setScale((prev) => Math.min(prev + 0.15, 2.5));
@@ -286,7 +306,7 @@ export default function TimelineScreen() {
         const buf = await response.arrayBuffer();
         workbook = XLSX.read(buf, { type: "array" });
       } else {
-        const FileSystem = await import("expo-file-system");
+        const FileSystem = await import("expo-file-system/legacy");
         const base64 = await FileSystem.readAsStringAsync(asset.uri, {
           encoding: FileSystem.EncodingType.Base64,
         });
@@ -401,6 +421,57 @@ export default function TimelineScreen() {
     }
   }, [timelineCtx, settingsCtx.settings]);
 
+  const handleImportSqlFile = useCallback(async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: ["text/plain", "application/sql", "*/*"],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (res.canceled || !res.assets || res.assets.length === 0) return;
+
+      const asset = res.assets[0];
+      if (!asset.name?.toLowerCase().endsWith(".sql")) {
+        toast.error("Lutfen .sql uzantili bir dosya secin.");
+        return;
+      }
+
+      let sqlContent = "";
+      if (Platform.OS === "web") {
+        const response = await fetch(asset.uri);
+        sqlContent = await response.text();
+      } else {
+        const FileSystem = await import("expo-file-system/legacy");
+        sqlContent = await FileSystem.readAsStringAsync(asset.uri, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+      }
+
+      if (!sqlContent.trim()) {
+        toast.error("SQL dosyasi bos gorunuyor.");
+        return;
+      }
+
+      const response = await fetch("/api/postgres", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "importSql",
+          data: { sqlContent },
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "SQL yukleme basarisiz.");
+      }
+
+      await timelineCtx.loadInitialData();
+      toast.success(`SQL yuklendi (${result.data?.executedStatements ?? 0} komut calisti).`);
+    } catch (error) {
+      toast.error((error as Error)?.message || "SQL dosyasi yuklenemedi.");
+    }
+  }, [timelineCtx]);
+
   const scrollSourceRef = useRef<"main" | "header" | null>(null);
 
   const handleHorizontalScroll = useCallback((e: any) => {
@@ -446,7 +517,7 @@ export default function TimelineScreen() {
         region: c.region,
         eventCount: timelineCtx.events.filter(e => e.civilizationId === c.id).length,
       })),
-      eventsByPeriod: PERIODS.slice(1).map(p => ({
+      eventsByPeriod: periodOptions.slice(1).map(p => ({
         period: p.label,
         count: timelineCtx.events.filter(e => e.period === p.id).length,
       })),
@@ -490,7 +561,7 @@ ${report.eventsByPeriod.map(p => `• ${p.period}: ${p.count} olay`).join('\n')}
         });
       });
     }
-  }, [timelineCtx.civilizations, timelineCtx.events, settingsCtx.settings]);
+  }, [timelineCtx.civilizations, timelineCtx.events, settingsCtx.settings, periodOptions]);
 
   const handleLogout = useCallback(async () => {
     const doLogout = async () => {
@@ -533,13 +604,13 @@ ${report.eventsByPeriod.map(p => `• ${p.period}: ${p.count} olay`).join('\n')}
     }
   }, [router]);
 
-  const sideColumnWidth = 110;
+  const sideColumnWidth = isCompactWeb ? 92 : 120;
 
   return (
     <SafeAreaView style={styles.root} edges={["top"]}>
       <ToastContainer />
       {/* App Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, isCompactWeb && styles.headerCompact]}>
         <View style={styles.headerLeft}>
           <View style={styles.logoBadge}>
             <Sparkles size={16} color="#1a1a1a" />
@@ -550,7 +621,7 @@ ${report.eventsByPeriod.map(p => `• ${p.period}: ${p.count} olay`).join('\n')}
           </View>
         </View>
 
-        <View style={styles.headerRight}>
+        <View style={[styles.headerRight, isCompactWeb && styles.headerRightCompact]}>
           {reorderMode && (
             <TouchableOpacity
               style={[styles.iconBtn, styles.iconBtnDone]}
@@ -566,6 +637,13 @@ ${report.eventsByPeriod.map(p => `• ${p.period}: ${p.count} olay`).join('\n')}
             testID="import-btn"
           >
             <Upload size={18} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={handleImportSqlFile}
+            testID="import-sql-btn"
+          >
+            <Database size={18} color="#fff" />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.iconBtn, searchOpen && styles.iconBtnActive]}
@@ -600,7 +678,7 @@ ${report.eventsByPeriod.map(p => `• ${p.period}: ${p.count} olay`).join('\n')}
 
       {/* Search Bar */}
       {searchOpen && (
-        <View style={styles.searchBar}>
+        <View style={[styles.searchBar, isCompactWeb && styles.searchBarCompact]}>
           <Search size={16} color="#888" />
           <TextInput
             style={styles.searchInput}
@@ -625,7 +703,7 @@ ${report.eventsByPeriod.map(p => `• ${p.period}: ${p.count} olay`).join('\n')}
         style={styles.filterStrip}
         contentContainerStyle={styles.filterStripContent}
       >
-        {PERIODS.map((p) => {
+        {periodOptions.map((p) => {
           const active = periodFilter === p.id;
           return (
             <TouchableOpacity
@@ -869,7 +947,7 @@ ${report.eventsByPeriod.map(p => `• ${p.period}: ${p.count} olay`).join('\n')}
 
       {/* Minimap */}
       {showMinimap && (
-        <View style={styles.minimap}>
+        <View style={[styles.minimap, isCompactWeb && styles.minimapCompact]}>
           <View style={styles.minimapHeader}>
             <Text style={styles.minimapTitle}>Overview</Text>
             <TouchableOpacity onPress={() => setShowMinimap(false)}>
@@ -932,7 +1010,7 @@ ${report.eventsByPeriod.map(p => `• ${p.period}: ${p.count} olay`).join('\n')}
       )}
 
       {/* Floating Action Button */}
-      <View style={styles.fabContainer} pointerEvents="box-none">
+      <View style={[styles.fabContainer, isCompactWeb && styles.fabContainerCompact]} pointerEvents="box-none">
         {fabOpen && (
           <View style={styles.fabMenu}>
             <TouchableOpacity
@@ -961,6 +1039,16 @@ ${report.eventsByPeriod.map(p => `• ${p.period}: ${p.count} olay`).join('\n')}
             >
               <FileText size={14} color="#c9a227" />
               <Text style={styles.fabMenuText}>Rapor Al</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.fabMenuItem}
+              onPress={() => {
+                setFabOpen(false);
+                handleImportSqlFile();
+              }}
+            >
+              <Database size={14} color="#c9a227" />
+              <Text style={styles.fabMenuText}>SQL Yukle</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.fabMenuItem}
@@ -1041,47 +1129,51 @@ ${report.eventsByPeriod.map(p => `• ${p.period}: ${p.count} olay`).join('\n')}
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#0f0f10",
+    backgroundColor: "#0b0e14",
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: "#17171a",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    backgroundColor: "#111827",
     borderBottomWidth: 1,
-    borderBottomColor: "#222",
+    borderBottomColor: "#1f2937",
+  },
+  headerCompact: {
+    paddingHorizontal: 12,
   },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
   logoBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     backgroundColor: "#c9a227",
     justifyContent: "center",
     alignItems: "center",
   },
   title: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "800",
     color: "#fff",
     letterSpacing: 0.3,
   },
   subtitle: {
     fontSize: 10,
-    color: "#777",
+    color: "#94a3b8",
     marginTop: 1,
     letterSpacing: 1.2,
     textTransform: "uppercase",
     fontWeight: "600",
   },
   headerRight: { flexDirection: "row", alignItems: "center", gap: 6 },
+  headerRightCompact: { gap: 4 },
   iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: "#232327",
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#1f2937",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -1130,14 +1222,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#1e1e22",
-    marginHorizontal: 12,
-    marginTop: 10,
-    paddingHorizontal: 12,
-    height: 40,
-    borderRadius: 10,
+    backgroundColor: "#111827",
+    marginHorizontal: 14,
+    marginTop: 12,
+    paddingHorizontal: 14,
+    height: 44,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#2a2a2e",
+    borderColor: "#1f2937",
+  },
+  searchBarCompact: {
+    marginHorizontal: 10,
+    height: 40,
   },
   searchInput: {
     flex: 1,
@@ -1149,43 +1245,43 @@ const styles = StyleSheet.create({
     maxHeight: 44,
   },
   filterStripContent: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 8,
   },
   filterChip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: "#1b1b1f",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: "#111827",
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#28282c",
+    borderColor: "#1f2937",
   },
   chipDot: { width: 7, height: 7, borderRadius: 3.5 },
-  chipText: { color: "#aaa", fontSize: 11, fontWeight: "600" },
+  chipText: { color: "#cbd5e1", fontSize: 11, fontWeight: "700" },
   statsBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: "#141416",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "#0f172a",
     borderTopWidth: 1,
-    borderTopColor: "#202022",
+    borderTopColor: "#1e293b",
     borderBottomWidth: 1,
-    borderBottomColor: "#202022",
+    borderBottomColor: "#1e293b",
   },
   statGroup: { flexDirection: "row", alignItems: "center", gap: 6 },
-  statText: { color: "#aaa", fontSize: 11, fontWeight: "600" },
+  statText: { color: "#cbd5e1", fontSize: 11, fontWeight: "700" },
   zoomGroup: { flexDirection: "row", alignItems: "center", gap: 6 },
   zoomBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 7,
-    backgroundColor: "#232327",
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "#1f2937",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -1198,16 +1294,16 @@ const styles = StyleSheet.create({
   },
   headerRowContainer: {
     flexDirection: "row",
-    backgroundColor: "#17171a",
+    backgroundColor: "#111827",
     borderBottomWidth: 1,
-    borderBottomColor: "#222",
+    borderBottomColor: "#1f2937",
   },
   cornerCell: {
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#1b1b1e",
+    backgroundColor: "#0f172a",
     borderRightWidth: 1,
-    borderRightColor: "#262629",
+    borderRightColor: "#1f2937",
   },
   cornerText: {
     color: "#c9a227",
@@ -1225,7 +1321,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 3,
     borderRightWidth: 1,
     borderRightColor: "#222",
-    backgroundColor: "#1a1a1d",
+    backgroundColor: "#111827",
   },
   civHeaderSel: { backgroundColor: "rgba(201, 162, 39, 0.12)" },
   civColorDot: {
@@ -1260,15 +1356,15 @@ const styles = StyleSheet.create({
   mainScroll: { flex: 1 },
   gridRow: { flexDirection: "row" },
   sideColumn: {
-    backgroundColor: "#131316",
+    backgroundColor: "#0f172a",
     borderRightWidth: 1,
-    borderRightColor: "#222",
+    borderRightColor: "#1f2937",
   },
   sideCell: {
     paddingHorizontal: 8,
     justifyContent: "center",
     borderBottomWidth: 1,
-    borderBottomColor: "#202024",
+    borderBottomColor: "#1f2937",
   },
   sideCellSel: {
     backgroundColor: "rgba(201, 162, 39, 0.18)",
@@ -1331,18 +1427,23 @@ const styles = StyleSheet.create({
   minimap: {
     position: "absolute",
     right: 12,
-    top: 160,
-    width: 220,
-    backgroundColor: "rgba(20, 20, 22, 0.96)",
-    borderRadius: 12,
+    top: 176,
+    width: 240,
+    backgroundColor: "rgba(15, 23, 42, 0.96)",
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#2a2a2e",
-    padding: 10,
+    borderColor: "#334155",
+    padding: 12,
     shadowColor: "#000",
     shadowOpacity: 0.4,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
     elevation: 8,
+  },
+  minimapCompact: {
+    width: 210,
+    right: 10,
+    top: 168,
   },
   minimapHeader: {
     flexDirection: "row",
@@ -1361,8 +1462,8 @@ const styles = StyleSheet.create({
   minimapRow: { gap: 3 },
   minimapCivName: { color: "#ddd", fontSize: 9, fontWeight: "600" },
   minimapTrack: {
-    height: 10,
-    backgroundColor: "#232327",
+    height: 11,
+    backgroundColor: "#1f2937",
     borderRadius: 3,
     overflow: "hidden",
     position: "relative",
@@ -1376,15 +1477,19 @@ const styles = StyleSheet.create({
   },
   fabContainer: {
     position: "absolute",
-    bottom: 24,
-    right: 20,
+    bottom: 22,
+    right: 22,
     alignItems: "flex-end",
     gap: 10,
   },
+  fabContainerCompact: {
+    right: 14,
+    bottom: 16,
+  },
   fab: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: "#c9a227",
     justifyContent: "center",
     alignItems: "center",
@@ -1395,12 +1500,12 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   fabMenu: {
-    backgroundColor: "rgba(20, 20, 22, 0.96)",
-    borderRadius: 14,
+    backgroundColor: "rgba(15, 23, 42, 0.97)",
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#2a2a2e",
+    borderColor: "#334155",
     paddingVertical: 6,
-    minWidth: 180,
+    minWidth: 200,
     shadowColor: "#000",
     shadowOpacity: 0.5,
     shadowRadius: 10,
@@ -1417,12 +1522,12 @@ const styles = StyleSheet.create({
   fabMenuText: { color: "#eee", fontSize: 13, fontWeight: "600" },
   cellPill: {
     position: "absolute",
-    bottom: 24,
-    left: 20,
+    bottom: 22,
+    left: 22,
     backgroundColor: "rgba(201, 162, 39, 0.95)",
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 22,
     shadowColor: "#000",
     shadowOpacity: 0.3,
     shadowRadius: 6,
@@ -1437,7 +1542,7 @@ const styles = StyleSheet.create({
   scrollTopBtn: {
     position: "absolute",
     bottom: 100,
-    right: 20,
+    right: 22,
     width: 48,
     height: 48,
     borderRadius: 24,
