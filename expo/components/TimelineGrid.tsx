@@ -56,16 +56,41 @@ interface TimelineGridProps {
 
 function getPeriodColor(period: string): string {
   const colors: Record<string, string> = {
-    Prepalatial: "#8B4513",
-    Protopalatial: "#CD853F",
-    Neopalatial: "#DAA520",
-    Postpalatial: "#B8860B",
-    Archaic: "#4682B4",
-    Classical: "#5F9EA0",
-    Hellenistic: "#6495ED",
-    Other: "#708090",
+    Prepalatial: "#d97706",
+    Protopalatial: "#f59e0b",
+    Neopalatial: "#eab308",
+    Postpalatial: "#f97316",
+    Archaic: "#3b82f6",
+    Classical: "#06b6d4",
+    Hellenistic: "#6366f1",
+    Other: "#64748b",
   };
   return colors[period] || colors.Other;
+}
+
+function hashString(value: string): number {
+  let h = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    h = (h << 5) - h + value.charCodeAt(i);
+    h |= 0;
+  }
+  return Math.abs(h);
+}
+
+function getEventDisplayColor(event: PeriodEvent): string {
+  if (event.color) return event.color;
+  if (event.period && event.period !== "Other") return getPeriodColor(event.period);
+  const vividPalette = [
+    "#22c55e",
+    "#14b8a6",
+    "#0ea5e9",
+    "#8b5cf6",
+    "#ec4899",
+    "#ef4444",
+    "#f59e0b",
+    "#84cc16",
+  ];
+  return vividPalette[hashString(`${event.id}-${event.title}`) % vividPalette.length];
 }
 
 function clamp(n: number, min: number, max: number): number {
@@ -332,9 +357,8 @@ export function TimelineGrid({
             const slotWidth = (cellWidth - 6) / (p.totalSlots || 1);
             const left = 3 + p.slot * slotWidth;
             const width = Math.max(slotWidth - 3, 16);
-            const color = p.event.color || getPeriodColor(p.event.period);
-            const isNarrow = width < 84;
-            const showLabel = p.height > 30;
+            const color = getEventDisplayColor(p.event);
+            const showLabel = p.height > 56;
             const isEvtSel = selectedEvent?.id === p.event.id;
             return (
               <TouchableOpacity
@@ -355,14 +379,9 @@ export function TimelineGrid({
                 ]}
               >
                 <View style={styles.eventBarGlow} pointerEvents="none" />
-                {showLabel && !isNarrow && (
-                  <Text style={styles.eventBarTitle} numberOfLines={1} ellipsizeMode="tail">
-                    {p.event.title}
-                  </Text>
-                )}
-                {showLabel && isNarrow && (
-                  <View style={styles.eventBarTitlePill}>
-                    <Text style={styles.eventBarTitlePillText} numberOfLines={1} ellipsizeMode="tail">
+                {showLabel && (
+                  <View style={styles.eventBarVerticalLabel}>
+                    <Text style={styles.eventBarVerticalText} numberOfLines={1} ellipsizeMode="tail">
                       {p.event.title}
                     </Text>
                   </View>
@@ -595,31 +614,34 @@ const styles = StyleSheet.create({
   },
   eventBarGlow: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
-  eventBarTitle: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.2,
-  },
-  eventBarTitlePill: {
+  eventBarVerticalLabel: {
     position: "absolute",
-    top: 2,
-    left: 2,
-    right: 2,
-    backgroundColor: "rgba(2, 6, 23, 0.7)",
-    borderRadius: 6,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
+    top: 5,
+    bottom: 5,
+    left: 4,
+    width: 16,
+    backgroundColor: "rgba(2, 6, 23, 0.52)",
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
+    borderColor: "rgba(255,255,255,0.24)",
   },
-  eventBarTitlePillText: {
+  eventBarVerticalText: {
     color: "#ffffff",
     fontSize: 9,
     fontWeight: "800",
-    letterSpacing: 0.1,
+    letterSpacing: 0.2,
+    ...(Platform.OS === "web"
+      ? ({
+          writingMode: "vertical-rl",
+          textOrientation: "mixed",
+        } as any)
+      : {
+          transform: [{ rotate: "90deg" }],
+        }),
   },
   eventBarTag: {
     marginTop: 4,
