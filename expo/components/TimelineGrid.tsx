@@ -184,6 +184,7 @@ export function TimelineGrid({
   const { settings } = useSettings();
   const [hoveredPhotoId, setHoveredPhotoId] = useState<string | null>(null);
   const labelOnRight = settings.eventLabelDirection === "right";
+  const readableLabelFontSize = Math.max(12, settings.eventLabelFontSize || 12);
 
   const civIndex = useMemo(() => {
     const m = new Map<string, number>();
@@ -398,7 +399,6 @@ export function TimelineGrid({
                     left,
                     width,
                     backgroundColor: color,
-                    borderLeftColor: civ.color,
                   },
                 ]}
               >
@@ -415,14 +415,15 @@ export function TimelineGrid({
                     <Text
                       style={[
                         styles.eventBarVerticalText,
-                        { fontSize: settings.eventLabelFontSize },
+                        { fontSize: readableLabelFontSize },
                         Platform.OS === "web"
                           ? (({
-                              writingMode: labelOnRight ? "vertical-lr" : "vertical-rl",
+                              writingMode: labelOnRight ? "vertical-rl" : "vertical-lr",
                               textOrientation: "mixed",
+                              transform: [{ rotate: "180deg" }],
                             } as any))
                           : {
-                              transform: [{ rotate: labelOnRight ? "-90deg" : "90deg" }],
+                              transform: [{ rotate: labelOnRight ? "90deg" : "-90deg" }],
                             },
                       ]}
                       numberOfLines={1}
@@ -470,7 +471,7 @@ export function TimelineGrid({
       clearCell,
       hoveredPhotoId,
       labelOnRight,
-      settings.eventLabelFontSize,
+      readableLabelFontSize,
     ]
   );
 
@@ -669,7 +670,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 7,
     paddingVertical: 5,
-    borderLeftWidth: 3,
     overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -685,13 +685,13 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 5,
     bottom: 5,
-    width: 16,
-    backgroundColor: "rgba(2, 6, 23, 0.52)",
-    borderRadius: 8,
+    width: 24,
+    backgroundColor: "rgba(2, 6, 23, 0.82)",
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.24)",
+    borderColor: "rgba(255,255,255,0.35)",
   },
   eventBarVerticalLabelLeft: {
     left: 4,
@@ -701,8 +701,11 @@ const styles = StyleSheet.create({
   },
   eventBarVerticalText: {
     color: "#ffffff",
-    fontWeight: "800",
-    letterSpacing: 0.2,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+    textShadowColor: "rgba(0,0,0,0.35)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   eventBarTag: {
     marginTop: 4,
