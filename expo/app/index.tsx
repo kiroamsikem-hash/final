@@ -10,6 +10,7 @@ import {
   Animated,
   Platform,
   useWindowDimensions,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -77,6 +78,9 @@ export default function TimelineScreen() {
   const [fabOpen, setFabOpen] = useState<boolean>(false);
   const [reorderMode, setReorderMode] = useState<boolean>(false);
   const [showScrollTop, setShowScrollTop] = useState<boolean>(false);
+  const [showReportConfig, setShowReportConfig] = useState<boolean>(false);
+  const [reportStartYear, setReportStartYear] = useState<string>("");
+  const [reportEndYear, setReportEndYear] = useState<string>("");
   const { width: viewportWidth } = useWindowDimensions();
   const isCompactWeb = Platform.OS === "web" && viewportWidth < 1280;
 
@@ -504,23 +508,52 @@ export default function TimelineScreen() {
   }, []);
 
   const handleExportReport = useCallback(() => {
+    setReportStartYear(String(Math.abs(settingsCtx.settings.startYear)));
+    setReportEndYear(String(Math.abs(settingsCtx.settings.endYear)));
+    setShowReportConfig(true);
+  }, [settingsCtx.settings.startYear, settingsCtx.settings.endYear]);
+
+  const handleGenerateReport = useCallback(() => {
+    const parsedStart = -Math.abs(parseInt(reportStartYear || "0", 10));
+    const parsedEnd = -Math.abs(parseInt(reportEndYear || "0", 10));
+    if (Number.isNaN(parsedStart) || Number.isNaN(parsedEnd)) {
+      toast.error("Gecerli bir tarih araligi girin.");
+      return;
+    }
+    const rangeMin = Math.min(parsedStart, parsedEnd);
+    const rangeMax = Math.max(parsedStart, parsedEnd);
+    const eventsInRange = timelineCtx.events.filter((e) => {
+      const eMin = Math.min(e.startYear, e.endYear);
+      const eMax = Math.max(e.startYear, e.endYear);
+      return eMax >= rangeMin && eMin <= rangeMax;
+    });
+
     const report = {
       generatedAt: new Date().toISOString(),
       civilizations: timelineCtx.civilizations.length,
-      events: timelineCtx.events.length,
+      events: eventsInRange.length,
       yearRange: {
-        start: settingsCtx.settings.startYear,
-        end: settingsCtx.settings.endYear,
+        start: parsedStart,
+        end: parsedEnd,
       },
       civilizationsList: timelineCtx.civilizations.map(c => ({
         name: c.name,
         region: c.region,
-        eventCount: timelineCtx.events.filter(e => e.civilizationId === c.id).length,
+        eventCount: eventsInRange.filter(e => e.civilizationId === c.id).length,
       })),
       eventsByPeriod: periodOptions.slice(1).map(p => ({
         period: p.label,
-        count: timelineCtx.events.filter(e => e.period === p.id).length,
+        count: eventsInRange.filter(e => e.period === p.id).length,
       })),
+      topEvents: eventsInRange
+        .sort((a, b) => a.startYear - b.startYear)
+        .slice(0, 80)
+        .map((e) => ({
+          title: e.title,
+          period: e.period,
+          years: `${Math.abs(e.startYear)}-${Math.abs(e.endYear)} BC`,
+          civilization: timelineCtx.civilizations.find((c) => c.id === e.civilizationId)?.name || "Unknown",
+        })),
     };
 
     const reportText = `
@@ -540,6 +573,10 @@ ${report.civilizationsList.map(c => `• ${c.name} (${c.region}) - ${c.eventCoun
 DÖNEMLERE GÖRE OLAYLAR
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${report.eventsByPeriod.map(p => `• ${p.period}: ${p.count} olay`).join('\n')}
+
+OLAY DETAY LISTESI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${report.topEvents.map(e => `• [${e.years}] ${e.title} | ${e.period} | ${e.civilization}`).join('\n')}
     `.trim();
 
     if (Platform.OS === "web") {
@@ -561,7 +598,8 @@ ${report.eventsByPeriod.map(p => `• ${p.period}: ${p.count} olay`).join('\n')}
         });
       });
     }
-  }, [timelineCtx.civilizations, timelineCtx.events, settingsCtx.settings, periodOptions]);
+    setShowReportConfig(false);
+  }, [reportStartYear, reportEndYear, timelineCtx.civilizations, timelineCtx.events, periodOptions]);
 
   const handleLogout = useCallback(async () => {
     const doLogout = async () => {
@@ -1102,6 +1140,39 @@ ${report.eventsByPeriod.map(p => `• ${p.period}: ${p.count} olay`).join('\n')}
         </View>
       )}
 
+      <Modal visible={showReportConfig} transparent animationType="fade" onRequestClose={() => setShowReportConfig(false)}>
+        <View style={styles.reportOverlay}>
+          <View style={styles.reportModal}>
+            <Text style={styles.reportTitle}>Detayli Rapor Ayarlari</Text>
+            <Text style={styles.reportHint}>Tarih araligini M.Ö yil olarak girin</Text>
+            <TextInput
+              style={styles.reportInput}
+              value={reportStartYear}
+              onChangeText={setReportStartYear}
+              keyboardType="number-pad"
+              placeholder="Baslangic (orn: 4000)"
+              placeholderTextColor="#94a3b8"
+            />
+            <TextInput
+              style={styles.reportInput}
+              value={reportEndYear}
+              onChangeText={setReportEndYear}
+              keyboardType="number-pad"
+              placeholder="Bitis (orn: 500)"
+              placeholderTextColor="#94a3b8"
+            />
+            <View style={styles.reportButtons}>
+              <TouchableOpacity style={[styles.reportButton, styles.reportCancel]} onPress={() => setShowReportConfig(false)}>
+                <Text style={styles.reportButtonText}>Iptal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.reportButton, styles.reportConfirm]} onPress={handleGenerateReport}>
+                <Text style={styles.reportButtonText}>Raporu Al</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <InspectorPanel
         visible={inspectorOpen}
         onClose={handleCloseInspector}
@@ -1112,6 +1183,7 @@ ${report.eventsByPeriod.map(p => `• ${p.period}: ${p.count} olay`).join('\n')}
         civilizations={timelineCtx.civilizations}
         onUpdateCivilization={timelineCtx.updateCivilization}
         onDeleteCivilization={timelineCtx.deleteCivilization}
+        onUpdateEvent={timelineCtx.updateEvent}
       />
 
       <CellEditor
@@ -1559,5 +1631,63 @@ const styles = StyleSheet.create({
     color: "#1a1a1a",
     fontSize: 24,
     fontWeight: "900",
+  },
+  reportOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(2,6,23,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 16,
+  },
+  reportModal: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: "#0f172a",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#334155",
+    padding: 16,
+    gap: 10,
+  },
+  reportTitle: {
+    color: "#f8fafc",
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  reportHint: {
+    color: "#94a3b8",
+    fontSize: 12,
+  },
+  reportInput: {
+    backgroundColor: "#111827",
+    borderWidth: 1,
+    borderColor: "#334155",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: "#e2e8f0",
+    fontSize: 14,
+  },
+  reportButtons: {
+    marginTop: 6,
+    flexDirection: "row",
+    gap: 8,
+  },
+  reportButton: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  reportCancel: {
+    backgroundColor: "#334155",
+  },
+  reportConfirm: {
+    backgroundColor: "#c9a227",
+  },
+  reportButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
   },
 });

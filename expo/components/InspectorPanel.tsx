@@ -24,6 +24,7 @@ interface InspectorPanelProps {
   civilizations: Civilization[];
   onUpdateCivilization?: (civ: Civilization) => void;
   onDeleteCivilization?: (civId: string) => void;
+  onUpdateEvent?: (event: PeriodEvent) => void;
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -38,6 +39,7 @@ export function InspectorPanel({
   civilizations,
   onUpdateCivilization,
   onDeleteCivilization,
+  onUpdateEvent,
 }: InspectorPanelProps) {
   const [editMode, setEditMode] = useState(false);
   const [editedName, setEditedName] = useState("");
@@ -48,6 +50,12 @@ export function InspectorPanel({
   const [editedColor, setEditedColor] = useState("");
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [customColor, setCustomColor] = useState("");
+  const [editedEventTitle, setEditedEventTitle] = useState("");
+  const [editedEventDescription, setEditedEventDescription] = useState("");
+  const [editedEventPeriod, setEditedEventPeriod] = useState("");
+  const [editedEventStartYear, setEditedEventStartYear] = useState("");
+  const [editedEventEndYear, setEditedEventEndYear] = useState("");
+  const [editedEventColor, setEditedEventColor] = useState("");
 
   // Reset edit mode when panel closes or civilization changes
   React.useEffect(() => {
@@ -59,6 +67,17 @@ export function InspectorPanel({
   React.useEffect(() => {
     setEditMode(false);
   }, [selectedCivilization?.id]);
+
+  React.useEffect(() => {
+    if (!selectedEvent) return;
+    setEditedEventTitle(selectedEvent.title || "");
+    setEditedEventDescription(selectedEvent.description || "");
+    setEditedEventPeriod(selectedEvent.period || "Other");
+    setEditedEventStartYear(String(Math.abs(selectedEvent.startYear || 0)));
+    setEditedEventEndYear(String(Math.abs(selectedEvent.endYear || 0)));
+    setEditedEventColor(selectedEvent.color || "");
+    setEditMode(false);
+  }, [selectedEvent]);
 
   const formatYear = (year: number): string => {
     return `${Math.abs(year)} BC`;
@@ -163,60 +182,159 @@ export function InspectorPanel({
     }
   };
 
+  const handleSaveEvent = () => {
+    if (!selectedEvent || !onUpdateEvent) return;
+    if (!editedEventTitle.trim()) {
+      Alert.alert("Hata", "Olay basligi bos olamaz");
+      return;
+    }
+    const s = parseInt(editedEventStartYear || "0", 10);
+    const e = parseInt(editedEventEndYear || "0", 10);
+    if (Number.isNaN(s) || Number.isNaN(e)) {
+      Alert.alert("Hata", "Gecerli yil girin");
+      return;
+    }
+    const updated: PeriodEvent = {
+      ...selectedEvent,
+      title: editedEventTitle.trim(),
+      description: editedEventDescription.trim(),
+      period: editedEventPeriod.trim() || "Other",
+      startYear: -Math.abs(s),
+      endYear: -Math.abs(e),
+      color: editedEventColor.trim() || undefined,
+    };
+    onUpdateEvent(updated);
+    setEditMode(false);
+    setShowColorPicker(false);
+  };
+
   const renderContent = () => {
     if (selectedEvent) {
       const civ = getCivilization(selectedEvent.civilizationId);
       return (
         <View style={styles.content}>
           <View style={styles.header}>
-            <View style={[styles.periodBadge, { backgroundColor: getPeriodColor(selectedEvent.period) }]}>
-              <Text style={styles.periodText}>{selectedEvent.period}</Text>
+            <View style={[styles.periodBadge, { backgroundColor: selectedEvent.color || getPeriodColor(selectedEvent.period) }]}>
+              <Text style={styles.periodText}>{editMode ? editedEventPeriod : selectedEvent.period}</Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <X size={20} color="#fff" />
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              {!editMode ? (
+                <TouchableOpacity onPress={() => setEditMode(true)} style={styles.actionButton}>
+                  <Edit2 size={18} color="#c9a227" />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity onPress={handleSaveEvent} style={styles.actionButton}>
+                  <Check size={18} color="#22c55e" />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <X size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
           </View>
 
-          <Text style={styles.title}>{selectedEvent.title}</Text>
-          
-          <View style={styles.metaRow}>
-            <View style={styles.metaItem}>
-              <Calendar size={14} color="#c9a227" />
-              <Text style={styles.metaText}>
-                {formatYear(selectedEvent.startYear)} - {formatYear(selectedEvent.endYear)}
-              </Text>
-            </View>
-          </View>
-
-          {civ && (
-            <View style={styles.metaRow}>
-              <View style={styles.metaItem}>
-                <MapPin size={14} color="#c9a227" />
-                <Text style={styles.metaText}>{civ.name} ({civ.region})</Text>
-              </View>
-            </View>
-          )}
-
-          <View style={styles.divider} />
-
-          <Text style={styles.description}>{selectedEvent.description}</Text>
-
-          {selectedEvent.tags.length > 0 && (
+          {editMode ? (
             <>
-              <View style={styles.divider} />
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Tag size={14} color="#c9a227" />
-                  <Text style={styles.sectionTitle}>Tags</Text>
-                </View>
-                <View style={styles.tagsContainer}>
-                  {selectedEvent.tags.map((tag, index) => (
-                    <View key={index} style={styles.tagBadge}>
-                      <Text style={styles.tagText}>{tag}</Text>
-                    </View>
-                  ))}
+              <TextInput style={styles.editInput} value={editedEventTitle} onChangeText={setEditedEventTitle} placeholder="Olay basligi" placeholderTextColor="#666" />
+              <View style={styles.metaRow}>
+                <View style={styles.metaItem}>
+                  <Clock size={14} color="#c9a227" />
+                  <TextInput
+                    style={[styles.editInputSmall, { flex: 0, width: 90, marginRight: 8 }]}
+                    value={editedEventStartYear}
+                    onChangeText={setEditedEventStartYear}
+                    placeholder="Baslangic"
+                    keyboardType="numeric"
+                    placeholderTextColor="#666"
+                  />
+                  <Text style={styles.metaText}>-</Text>
+                  <TextInput
+                    style={[styles.editInputSmall, { flex: 0, width: 90, marginLeft: 8 }]}
+                    value={editedEventEndYear}
+                    onChangeText={setEditedEventEndYear}
+                    placeholder="Bitis"
+                    keyboardType="numeric"
+                    placeholderTextColor="#666"
+                  />
                 </View>
               </View>
+              <TextInput style={styles.editInputSmall} value={editedEventPeriod} onChangeText={setEditedEventPeriod} placeholder="Donem" placeholderTextColor="#666" />
+              <View style={[styles.metaRow, { marginTop: 10 }]}>
+                <View style={styles.metaItem}>
+                  <Palette size={14} color="#c9a227" />
+                  <TouchableOpacity style={[styles.colorPreview, { backgroundColor: editedEventColor || "#334155" }]} onPress={() => setShowColorPicker(!showColorPicker)}>
+                    <Text style={styles.colorPreviewText}>Olay Rengi</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              {showColorPicker && (
+                <View style={styles.colorPickerContainer}>
+                  <View style={styles.colorPalette}>
+                    {CIVILIZATION_COLORS.map((color) => (
+                      <TouchableOpacity
+                        key={`evt-${color}`}
+                        style={[styles.colorOption, { backgroundColor: color }, editedEventColor === color && styles.colorOptionSelected]}
+                        onPress={() => setEditedEventColor(color)}
+                      />
+                    ))}
+                  </View>
+                </View>
+              )}
+              <View style={styles.divider} />
+              <TextInput
+                style={styles.editTextArea}
+                value={editedEventDescription}
+                onChangeText={setEditedEventDescription}
+                placeholder="Not / Aciklama"
+                placeholderTextColor="#666"
+                multiline
+                numberOfLines={5}
+              />
+            </>
+          ) : (
+            <>
+              <Text style={styles.title}>{selectedEvent.title}</Text>
+          
+              <View style={styles.metaRow}>
+                <View style={styles.metaItem}>
+                  <Calendar size={14} color="#c9a227" />
+                  <Text style={styles.metaText}>
+                    {formatYear(selectedEvent.startYear)} - {formatYear(selectedEvent.endYear)}
+                  </Text>
+                </View>
+              </View>
+
+              {civ && (
+                <View style={styles.metaRow}>
+                  <View style={styles.metaItem}>
+                    <MapPin size={14} color="#c9a227" />
+                    <Text style={styles.metaText}>{civ.name} ({civ.region})</Text>
+                  </View>
+                </View>
+              )}
+
+              <View style={styles.divider} />
+
+              <Text style={styles.description}>{selectedEvent.description}</Text>
+
+              {selectedEvent.tags.length > 0 && (
+                <>
+                  <View style={styles.divider} />
+                  <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                      <Tag size={14} color="#c9a227" />
+                      <Text style={styles.sectionTitle}>Tags</Text>
+                    </View>
+                    <View style={styles.tagsContainer}>
+                      {selectedEvent.tags.map((tag, index) => (
+                        <View key={index} style={styles.tagBadge}>
+                          <Text style={styles.tagText}>{tag}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                </>
+              )}
             </>
           )}
         </View>

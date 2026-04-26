@@ -26,6 +26,7 @@ interface TimelineContextType {
   getCellData: (year: number, civilizationId: string) => CellData | null;
   addCellPhoto: (year: number, civilizationId: string, photo: CellPhoto) => void;
   removeCellPhoto: (year: number, civilizationId: string, photoId: string) => void;
+  updateCellPhotoCaption: (year: number, civilizationId: string, photoId: string, caption: string) => void;
   addCellTag: (year: number, civilizationId: string, tag: string) => void;
   removeCellTag: (year: number, civilizationId: string, tag: string) => void;
   updateCellNotes: (year: number, civilizationId: string, notes: string) => void;
@@ -198,6 +199,24 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
       };
       updated[existingIndex] = targetCell;
 
+      saveSingleCellData(targetCell);
+      return updated;
+    });
+  }, [saveSingleCellData]);
+
+  const updateCellPhotoCaption = useCallback((year: number, civilizationId: string, photoId: string, caption: string) => {
+    setCellData((prev) => {
+      const existingIndex = prev.findIndex(c => c.year === year && c.civilizationId === civilizationId);
+      if (existingIndex < 0) return prev;
+
+      const updated = [...prev];
+      const targetCell = {
+        ...updated[existingIndex],
+        photos: updated[existingIndex].photos.map((p) =>
+          p.id === photoId ? { ...p, caption } : p
+        ),
+      };
+      updated[existingIndex] = targetCell;
       saveSingleCellData(targetCell);
       return updated;
     });
@@ -471,6 +490,7 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
         getCellData,
         addCellPhoto,
         removeCellPhoto,
+        updateCellPhotoCaption,
         addCellTag,
         removeCellTag,
         updateCellNotes,

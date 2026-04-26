@@ -369,11 +369,27 @@ export function CellEditor({
     [cell, timelineCtx]
   );
 
+  const handleUpdatePhotoCaption = useCallback(
+    (photoId: string, caption: string) => {
+      if (!cell) return;
+      timelineCtx.updateCellPhotoCaption(cell.year, cell.civilizationId, photoId, caption);
+    },
+    [cell, timelineCtx]
+  );
+
   const handleSaveNotes = useCallback(() => {
     if (!cell) return;
     timelineCtx.updateCellNotes(cell.year, cell.civilizationId, newNote);
-    Alert.alert("Saved", "Notes saved successfully!");
+    Alert.alert("Kaydedildi", "Notlar kaydedildi.");
   }, [cell, newNote, timelineCtx]);
+
+  useEffect(() => {
+    if (!visible || activeTab !== "notes" || !cell) return;
+    const timeout = setTimeout(() => {
+      timelineCtx.updateCellNotes(cell.year, cell.civilizationId, newNote);
+    }, 450);
+    return () => clearTimeout(timeout);
+  }, [visible, activeTab, cell, newNote, timelineCtx]);
 
   const handleSaveCellName = useCallback(() => {
     if (!cell) return;
@@ -760,6 +776,13 @@ export function CellEditor({
           {cellData.photos.map((photo) => (
             <View key={photo.id} style={styles.photoCard}>
               <Image source={{ uri: photo.uri }} style={styles.photoImage} />
+              <TextInput
+                style={styles.photoCaptionInput}
+                placeholder="Fotograf aciklamasi..."
+                placeholderTextColor="#94a3b8"
+                value={photo.caption || ""}
+                onChangeText={(text) => handleUpdatePhotoCaption(photo.id, text)}
+              />
               <TouchableOpacity
                 style={styles.photoDelete}
                 onPress={() => handleRemovePhoto(photo.id)}
@@ -1473,6 +1496,15 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(220, 20, 60, 0.9)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  photoCaptionInput: {
+    backgroundColor: "#0f172a",
+    borderTopWidth: 1,
+    borderTopColor: "#334155",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: "#e2e8f0",
+    fontSize: 12,
   },
   tagInputContainer: {
     flexDirection: "row",

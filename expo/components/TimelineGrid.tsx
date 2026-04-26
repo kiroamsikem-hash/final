@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from "react";
+import React, { useMemo, useCallback, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -182,6 +182,7 @@ export function TimelineGrid({
 }: TimelineGridProps) {
   const { removeCellPhoto, deleteEvent, clearCell } = useTimeline();
   const { settings } = useSettings();
+  const [hoveredPhotoId, setHoveredPhotoId] = useState<string | null>(null);
   const labelOnRight = settings.eventLabelDirection === "right";
 
   const civIndex = useMemo(() => {
@@ -303,8 +304,28 @@ export function TimelineGrid({
                 {photos.length > 0 && (
                   <View style={[styles.photosInline, { top: 22, height: photosBlockHeight, gap }]} pointerEvents="box-none">
                     {photos.map((ph) => (
-                      <View key={ph.id} style={[styles.photoTile, { width: photoSize, height: photoSize }]}>
+                      <Pressable
+                        key={ph.id}
+                        style={[styles.photoTile, { width: photoSize, height: photoSize }]}
+                        onHoverIn={() => setHoveredPhotoId(ph.id)}
+                        onHoverOut={() => setHoveredPhotoId((prev) => (prev === ph.id ? null : prev))}
+                        onPress={() => {
+                          if (!ph.caption?.trim()) return;
+                          if (Platform.OS === "web" && typeof window !== "undefined") {
+                            window.alert(ph.caption);
+                            return;
+                          }
+                          Alert.alert("Fotograf Aciklamasi", ph.caption);
+                        }}
+                      >
                         <Image source={{ uri: ph.uri }} style={styles.photoTileImg} />
+                        {!!ph.caption?.trim() && hoveredPhotoId === ph.id && (
+                          <View style={styles.photoCaptionOverlay}>
+                            <Text style={styles.photoCaptionText} numberOfLines={3}>
+                              {ph.caption}
+                            </Text>
+                          </View>
+                        )}
                         {isCellSel && (
                           <TouchableOpacity
                             style={styles.photoRemove}
@@ -315,7 +336,7 @@ export function TimelineGrid({
                             <X size={14} color="#fff" />
                           </TouchableOpacity>
                         )}
-                      </View>
+                      </Pressable>
                     ))}
                   </View>
                 )}
@@ -447,6 +468,7 @@ export function TimelineGrid({
       removeCellPhoto,
       deleteEvent,
       clearCell,
+      hoveredPhotoId,
       labelOnRight,
       settings.eventLabelFontSize,
     ]
@@ -550,6 +572,22 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     resizeMode: "cover",
+  },
+  photoCaptionOverlay: {
+    position: "absolute",
+    left: 2,
+    right: 2,
+    bottom: 2,
+    borderRadius: 4,
+    backgroundColor: "rgba(2,6,23,0.88)",
+    paddingHorizontal: 4,
+    paddingVertical: 3,
+  },
+  photoCaptionText: {
+    color: "#e2e8f0",
+    fontSize: 9,
+    lineHeight: 11,
+    fontWeight: "600",
   },
   photoRemove: {
     position: "absolute",
