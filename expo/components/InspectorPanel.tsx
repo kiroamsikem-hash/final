@@ -277,8 +277,28 @@ export function InspectorPanel({
               <View style={[styles.metaRow, { marginTop: 10 }]}>
                 <View style={styles.metaItem}>
                   <Palette size={14} color="#c9a227" />
-                  <TouchableOpacity style={[styles.colorPreview, { backgroundColor: editedEventColor || "#334155" }]} onPress={() => setShowColorPicker(!showColorPicker)}>
+                  <TouchableOpacity
+                    style={[styles.colorPreview, { backgroundColor: editedEventColor || "#334155" }]}
+                    onPress={() => setShowColorPicker(!showColorPicker)}
+                  >
                     <Text style={styles.colorPreviewText}>Olay Rengi</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.colorPreview,
+                      styles.textColorPreview,
+                      { backgroundColor: editedEventTextColor || "#f8fafc" },
+                    ]}
+                    onPress={() => setShowColorPicker(!showColorPicker)}
+                  >
+                    <Text
+                      style={[
+                        styles.colorPreviewText,
+                        { color: editedEventTextColor || "#111827" },
+                      ]}
+                    >
+                      Yazi Rengi
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -920,6 +940,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#555",
+  },
+  textColorPreview: {
+    borderColor: "#64748b",
   },
   colorPreviewText: {
     color: "#fff",
