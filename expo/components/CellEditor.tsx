@@ -59,16 +59,51 @@ const SUGGESTED_PERIODS: string[] = [
 ];
 
 const TAG_COLORS = [
-  "#c9a227",
-  "#8B4513",
-  "#CD853F",
-  "#4682B4",
-  "#5F9EA0",
-  "#6495ED",
-  "#DC143C",
-  "#228B22",
-  "#8A2BE2",
-  "#FF6347",
+  // Altın ve Kahverengi Tonları
+  "#c9a227", "#DAA520", "#FFD700", "#FFA500", "#FF8C00",
+  "#8B4513", "#A0522D", "#CD853F", "#D2691E", "#BC8F8F",
+  
+  // Mavi Tonları
+  "#4682B4", "#5F9EA0", "#6495ED", "#4169E1", "#1E90FF",
+  "#00BFFF", "#87CEEB", "#87CEFA", "#00CED1", "#20B2AA",
+  "#48D1CC", "#40E0D0", "#7FFFD4", "#B0E0E6", "#ADD8E6",
+  
+  // Kırmızı ve Pembe Tonları
+  "#DC143C", "#B22222", "#8B0000", "#CD5C5C", "#F08080",
+  "#FA8072", "#E9967A", "#FFA07A", "#FF6347", "#FF4500",
+  "#FF69B4", "#FF1493", "#C71585", "#DB7093", "#FFB6C1",
+  
+  // Yeşil Tonları
+  "#228B22", "#32CD32", "#00FF00", "#7FFF00", "#7CFC00",
+  "#ADFF2F", "#9ACD32", "#6B8E23", "#556B2F", "#8FBC8F",
+  "#90EE90", "#98FB98", "#00FA9A", "#00FF7F", "#3CB371",
+  "#2E8B57", "#66CDAA", "#8FBC8F", "#20B2AA", "#008B8B",
+  
+  // Mor ve Eflatun Tonları
+  "#8A2BE2", "#9370DB", "#9932CC", "#BA55D3", "#DA70D6",
+  "#EE82EE", "#DDA0DD", "#D8BFD8", "#E6E6FA", "#8B008B",
+  "#800080", "#9400D3", "#9932CC", "#4B0082", "#6A5ACD",
+  
+  // Turuncu ve Sarı Tonları
+  "#FF8C00", "#FFA500", "#FFB347", "#FFCC00", "#FFD700",
+  "#FFFF00", "#FFFFE0", "#FFFACD", "#FAFAD2", "#FFEFD5",
+  "#FFE4B5", "#FFDAB9", "#EEE8AA", "#F0E68C", "#BDB76B",
+  
+  // Gri ve Nötr Tonlar
+  "#708090", "#778899", "#696969", "#808080", "#A9A9A9",
+  "#C0C0C0", "#D3D3D3", "#DCDCDC", "#2F4F4F", "#556B2F",
+  
+  // Pastel Tonlar
+  "#FFB6C1", "#FFC0CB", "#FFE4E1", "#F0E68C", "#E0FFFF",
+  "#F5DEB3", "#F5F5DC", "#FFF8DC", "#FFFAF0", "#F0FFF0",
+  
+  // Koyu Tonlar
+  "#2F4F4F", "#191970", "#000080", "#00008B", "#483D8B",
+  "#8B0000", "#800000", "#8B008B", "#556B2F", "#006400",
+  
+  // Canlı Tonlar
+  "#FF00FF", "#00FFFF", "#00FF00", "#FFFF00", "#FF0000",
+  "#0000FF", "#FF1493", "#00CED1", "#FF4500", "#32CD32",
 ];
 
 export function CellEditor({
@@ -97,8 +132,10 @@ export function CellEditor({
   const [eventEndYear, setEventEndYear] = useState("");
   const [eventTags, setEventTags] = useState("");
   const [eventColor, setEventColor] = useState<string | undefined>(undefined);
+  const [eventTextColor, setEventTextColor] = useState<string | undefined>(undefined);
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showTextColorPicker, setShowTextColorPicker] = useState(false);
   const [availablePeriods, setAvailablePeriods] = useState<string[]>(SUGGESTED_PERIODS);
   const periodScrollRef = React.useRef<ScrollView>(null);
 
@@ -125,14 +162,16 @@ export function CellEditor({
   const resetEventForm = useCallback(() => {
     setEventTitle("");
     setEventDescription("");
-    setEventPeriod(""); // Bos baslasin, kullanici yazacak
+    setEventPeriod(""); // Boş başlasın, kullanıcı yazacak
     setEventStartYear(cell ? String(Math.abs(cell.year)) : "");
     setEventEndYear(cell ? String(Math.abs(cell.year)) : "");
     setEventTags("");
     setEventColor(undefined);
+    setEventTextColor(undefined);
     setShowEventForm(false);
     setShowPeriodDropdown(false);
     setShowColorPicker(false);
+    setShowTextColorPicker(false);
   }, [cell]);
 
   // Load existing notes and cell name when cell changes or modal opens
@@ -427,12 +466,13 @@ export function CellEditor({
       civilizationId: cell.civilizationId,
       tags: eventTags.split(",").map(t => t.trim()).filter(Boolean),
       color: eventColor,
+      textColor: eventTextColor,
     };
 
     timelineCtx.addEvent(newEvent);
     resetEventForm();
     Alert.alert("Success", "Event added successfully!");
-  }, [cell, civilization, eventTitle, eventDescription, eventPeriod, eventStartYear, eventEndYear, eventTags, eventColor, timelineCtx, resetEventForm]);
+  }, [cell, civilization, eventTitle, eventDescription, eventPeriod, eventStartYear, eventEndYear, eventTags, eventColor, eventTextColor, timelineCtx, resetEventForm]);
 
   const renderTabButton = (
     tab: "events" | "photos" | "tags" | "notes" | "related" | "name",
@@ -652,7 +692,8 @@ export function CellEditor({
               </Text>
             </TouchableOpacity>
             {showColorPicker && (
-              <View style={styles.colorPickerContainer}>
+              <ScrollView style={styles.colorPickerContainer} nestedScrollEnabled={true}>
+                <Text style={styles.colorPickerTitle}>🎨 Renk Seçin ({TAG_COLORS.length} renk)</Text>
                 <View style={styles.colorPalette}>
                   {TAG_COLORS.map((color) => (
                     <TouchableOpacity
@@ -664,7 +705,6 @@ export function CellEditor({
                       ]}
                       onPress={() => {
                         setEventColor(color);
-                        setShowColorPicker(false);
                       }}
                     />
                   ))}
@@ -678,7 +718,49 @@ export function CellEditor({
                 >
                   <Text style={styles.clearColorText}>Rengi Temizle</Text>
                 </TouchableOpacity>
-              </View>
+              </ScrollView>
+            )}
+          </View>
+
+          {/* Yazı Rengi Seçimi */}
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>✏️ Yazı Rengi (Opsiyonel)</Text>
+            <TouchableOpacity
+              style={[styles.colorPreviewButton, eventTextColor && { backgroundColor: eventTextColor }]}
+              onPress={() => setShowTextColorPicker(!showTextColorPicker)}
+            >
+              <Text style={[styles.colorPreviewText, eventTextColor && { color: '#fff' }]}>
+                {eventTextColor ? "✓ Yazı Rengi Seçildi" : "Yazı Rengi Seç"}
+              </Text>
+            </TouchableOpacity>
+            {showTextColorPicker && (
+              <ScrollView style={styles.colorPickerContainer} nestedScrollEnabled={true}>
+                <Text style={styles.colorPickerTitle}>✏️ Yazı Rengi Seçin ({TAG_COLORS.length} renk)</Text>
+                <View style={styles.colorPalette}>
+                  {TAG_COLORS.map((color) => (
+                    <TouchableOpacity
+                      key={color}
+                      style={[
+                        styles.colorOption,
+                        { backgroundColor: color },
+                        eventTextColor === color && styles.colorOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setEventTextColor(color);
+                      }}
+                    />
+                  ))}
+                </View>
+                <TouchableOpacity
+                  style={styles.clearColorButton}
+                  onPress={() => {
+                    setEventTextColor(undefined);
+                    setShowTextColorPicker(false);
+                  }}
+                >
+                  <Text style={styles.clearColorText}>Yazı Rengini Temizle</Text>
+                </TouchableOpacity>
+              </ScrollView>
             )}
           </View>
 
@@ -1795,23 +1877,32 @@ const styles = StyleSheet.create({
     marginTop: 8,
     borderWidth: 1,
     borderColor: "#334155",
+    maxHeight: 400,
+  },
+  colorPickerTitle: {
+    color: "#ddd",
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 12,
+    textAlign: "center",
   },
   colorPalette: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 8,
     marginBottom: 12,
   },
   colorOption: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 2,
     borderColor: "transparent",
   },
   colorOptionSelected: {
     borderColor: "#fff",
-    borderWidth: 3,
+    borderWidth: 4,
+    transform: [{ scale: 1.1 }],
   },
   clearColorButton: {
     backgroundColor: "#dc143c",

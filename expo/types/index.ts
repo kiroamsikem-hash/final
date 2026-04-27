@@ -21,7 +21,8 @@ export interface PeriodEvent {
   civilizationId: string;
   tags: string[];
   photoUrl?: string;
-  color?: string; // Özel event rengi
+  color?: string; // Özel event arka plan rengi
+  textColor?: string; // Özel event yazı rengi
 }
 
 export interface YearRow {

@@ -11,6 +11,12 @@ interface TimelineContextType {
   selectedEvent: PeriodEvent | null;
   selectedCivilization: Civilization | null;
   selectedCell: Cell | null;
+  historyIndex: number;
+  historyLength: number;
+  canUndo: boolean;
+  canRedo: boolean;
+  undo: () => void;
+  redo: () => void;
   setSelectedRow: (year: number | null) => void;
   setSelectedEvent: (event: PeriodEvent | null) => void;
   setSelectedCivilization: (civ: Civilization | null) => void;
@@ -50,9 +56,14 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
   const [selectedCivilization, setSelectedCivilization] = useState<Civilization | null>(null);
   const [selectedCell, setSelectedCell] = useState<Cell | null>(null);
 
+  // History tracking for undo/redo
+  const [history, setHistory] = useState<{events: PeriodEvent[], civilizations: Civilization[], cellData: CellData[]}[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+  const isUndoRedoAction = useRef<boolean>(false);
+
   // Track last save time - polling won't overwrite if save happened recently
   const lastSaveTimeRef = useRef<number>(0);
-  const SAVE_GRACE_PERIOD = 3000; // 3 seconds after save, skip polling
+  const SAVE_GRACE_PERIOD = 60000; // 60 saniye polling overwrite koruması
 
   // Real-time sync: Polling every 5 seconds
   useEffect(() => {
@@ -71,7 +82,14 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
         ]);
 
         if (dbCivs) setCivilizations(dbCivs);
-        if (dbEvents) setEvents(dbEvents);
+        if (dbEvents) {
+          // DB geç cevap verdiğinde yeni eklenen local eventler kaybolmasın
+          setEvents((prev) => {
+            const merged = new Map(prev.map((e) => [e.id, e] as const));
+            dbEvents.forEach((e) => merged.set(e.id, e));
+            return Array.from(merged.values());
+          });
+        }
         if (dbCellData) setCellData(dbCellData);
       } catch (error) {
         console.error('Polling error:', error);
@@ -91,6 +109,12 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
       setCivilizations(dbCivs || []);
       setEvents(dbEvents || []);
       setCellData(dbCellData || []);
+      
+      // İlk yükleme için history'ye ekle
+      if (dbCivs && dbEvents && dbCellData) {
+        setHistory([{events: dbEvents, civilizations: dbCivs, cellData: dbCellData}]);
+        setHistoryIndex(0);
+      }
     } catch (error) {
       console.error("❌ Database error:", error);
       setCivilizations([]);
@@ -98,6 +122,57 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
       setCellData([]);
     }
   }, []);
+
+  // History'ye yeni state ekle
+  const saveToHistory = useCallback(() => {
+    if (isUndoRedoAction.current) {
+      isUndoRedoAction.current = false;
+      return;
+    }
+    
+    const newState = {
+      events: [...events],
+      civilizations: [...civilizations],
+      cellData: [...cellData]
+    };
+    
+    // Mevcut index'ten sonraki history'yi sil
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(newState);
+    
+    // Max 50 history tut
+    if (newHistory.length > 50) {
+      newHistory.shift();
+    } else {
+      setHistoryIndex(historyIndex + 1);
+    }
+    
+    setHistory(newHistory);
+  }, [events, civilizations, cellData, history, historyIndex]);
+
+  // Undo fonksiyonu
+  const undo = useCallback(() => {
+    if (historyIndex > 0) {
+      isUndoRedoAction.current = true;
+      const prevState = history[historyIndex - 1];
+      setCivilizations(prevState.civilizations);
+      setEvents(prevState.events);
+      setCellData(prevState.cellData);
+      setHistoryIndex(historyIndex - 1);
+    }
+  }, [history, historyIndex]);
+
+  // Redo fonksiyonu
+  const redo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      isUndoRedoAction.current = true;
+      const nextState = history[historyIndex + 1];
+      setCivilizations(nextState.civilizations);
+      setEvents(nextState.events);
+      setCellData(nextState.cellData);
+      setHistoryIndex(historyIndex + 1);
+    }
+  }, [history, historyIndex]);
 
   useEffect(() => {
     loadInitialData();
@@ -395,15 +470,18 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
     setEvents((prev) => prev.filter(e => !(e.startYear === year && e.endYear === year)));
   }, []);
 
-  const addEvent = useCallback((event: PeriodEvent) => {
+  const addEvent = useCallback(async (event: PeriodEvent) => {
     setEvents((prev) => [...prev, event]);
-    saveSingleEvent(event);
-  }, [saveSingleEvent]);
+    await saveSingleEvent(event);
+    // History'yi biraz bekleyerek kaydet (state güncellensin diye)
+    setTimeout(() => saveToHistory(), 100);
+  }, [saveSingleEvent, saveToHistory]);
 
-  const updateEvent = useCallback((event: PeriodEvent) => {
+  const updateEvent = useCallback(async (event: PeriodEvent) => {
     setEvents((prev) => prev.map((e) => (e.id === event.id ? event : e)));
-    saveSingleEvent(event);
-  }, [saveSingleEvent]);
+    await saveSingleEvent(event);
+    setTimeout(() => saveToHistory(), 100);
+  }, [saveSingleEvent, saveToHistory]);
 
   const deleteEvent = useCallback((eventId: string) => {
     setEvents((prev) => prev.filter((e) => e.id !== eventId));
@@ -475,6 +553,12 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
         selectedEvent,
         selectedCivilization,
         selectedCell,
+        historyIndex,
+        historyLength: history.length,
+        canUndo: historyIndex > 0,
+        canRedo: historyIndex < history.length - 1,
+        undo,
+        redo,
         setSelectedRow,
         setSelectedEvent,
         setSelectedCivilization,

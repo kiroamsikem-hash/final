@@ -415,6 +415,7 @@ export function TimelineGrid({
                     <Text
                       style={[
                         styles.eventBarVerticalText,
+                        p.event.textColor ? { color: p.event.textColor } : null,
                         { fontSize: readableLabelFontSize },
                         Platform.OS === "web"
                           ? (({

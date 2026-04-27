@@ -17,6 +17,9 @@ export function EventCard({ event, onPress, compact = false }: EventCardProps) {
   const backgroundColor = event.color 
     ? event.color // Kullanıcının seçtiği renk direkt kullanılacak
     : getEventColor(event.period);
+  
+  // Use event's custom text color if available, otherwise use white
+  const textColor = event.textColor || "#fff";
 
   if (compact) {
     return (
@@ -25,7 +28,7 @@ export function EventCard({ event, onPress, compact = false }: EventCardProps) {
         onPress={onPress}
         activeOpacity={0.8}
       >
-        <Text style={styles.compactTitle} numberOfLines={1}>
+        <Text style={[styles.compactTitle, { color: textColor }]} numberOfLines={1}>
           {event.title}
         </Text>
       </TouchableOpacity>
@@ -38,17 +41,17 @@ export function EventCard({ event, onPress, compact = false }: EventCardProps) {
       onPress={onPress}
       activeOpacity={0.8}
     >
-      <Text style={styles.title} numberOfLines={2}>
+      <Text style={[styles.title, { color: textColor, textShadowColor: 'transparent' }]} numberOfLines={2}>
         {event.title}
       </Text>
       {duration > 50 && (
-        <Text style={styles.duration}>{durationText}</Text>
+        <Text style={[styles.duration, { color: textColor }]}>{durationText}</Text>
       )}
       {event.tags.length > 0 && (
         <View style={styles.tagsContainer}>
           {event.tags.slice(0, 1).map((tag, index) => (
             <View key={index} style={styles.tagBadge}>
-              <Text style={styles.tagText} numberOfLines={1}>{tag}</Text>
+              <Text style={[styles.tagText, { color: textColor }]} numberOfLines={1}>{tag}</Text>
             </View>
           ))}
         </View>
@@ -95,21 +98,15 @@ const styles = StyleSheet.create({
     minHeight: 28,
   },
   title: {
-    color: "#fff",
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "700",
-    textShadowColor: "rgba(0, 0, 0, 0.3)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
   compactTitle: {
-    color: "#fff",
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "600",
   },
   duration: {
-    color: "rgba(255, 255, 255, 0.8)",
-    fontSize: 9,
+    fontSize: 10,
     marginTop: 2,
     fontWeight: "500",
   },

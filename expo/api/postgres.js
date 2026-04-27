@@ -58,6 +58,7 @@ async function initializeTables() {
         tags JSONB,
         photo_url TEXT,
         color VARCHAR(7),
+        text_color VARCHAR(7),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -198,6 +199,7 @@ async function handleGetEvents(req, res) {
     tags: row.tags || [],
     photoUrl: row.photo_url,
     color: row.color,
+    textColor: row.text_color,
   }));
   res.status(200).json({ success: true, data });
 }
@@ -251,11 +253,11 @@ async function handleSaveCivilization(req, res, data) {
 
 // Save event
 async function handleSaveEvent(req, res, data) {
-  const { id, title, description, startYear, start_year, endYear, end_year, period, civilizationId, civilization_id, tags, photoUrl, photo_url, color } = data;
+  const { id, title, description, startYear, start_year, endYear, end_year, period, civilizationId, civilization_id, tags, photoUrl, photo_url, color, textColor, text_color } = data;
   
   await pool.query(`
-    INSERT INTO events (id, title, description, start_year, end_year, period, civilization_id, tags, photo_url, color)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    INSERT INTO events (id, title, description, start_year, end_year, period, civilization_id, tags, photo_url, color, text_color)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     ON CONFLICT (id) DO UPDATE SET
     title = EXCLUDED.title,
     description = EXCLUDED.description,
@@ -265,8 +267,9 @@ async function handleSaveEvent(req, res, data) {
     civilization_id = EXCLUDED.civilization_id,
     tags = EXCLUDED.tags,
     photo_url = EXCLUDED.photo_url,
-    color = EXCLUDED.color
-  `, [id, title, description, start_year || startYear, end_year || endYear, period, civilization_id || civilizationId, JSON.stringify(tags || []), photo_url || photoUrl, color]);
+    color = EXCLUDED.color,
+    text_color = EXCLUDED.text_color
+  `, [id, title, description, start_year || startYear, end_year || endYear, period, civilization_id || civilizationId, JSON.stringify(tags || []), photo_url || photoUrl, color, text_color || textColor]);
 
   res.status(200).json({ success: true });
 }

@@ -10,9 +10,10 @@ import {
   TextInput,
   Alert,
   Platform,
+  Image,
 } from "react-native";
 import { X, Calendar, MapPin, Tag, Info, Clock, Edit2, Trash2, Check, Palette } from "lucide-react-native";
-import { Civilization, PeriodEvent, CIVILIZATION_COLORS } from "@/types";
+import { Civilization, PeriodEvent, CIVILIZATION_COLORS, CellData, CellPhoto } from "@/types";
 
 interface InspectorPanelProps {
   visible: boolean;
@@ -22,6 +23,8 @@ interface InspectorPanelProps {
   selectedCivilization: Civilization | null;
   events: PeriodEvent[];
   civilizations: Civilization[];
+  cellData: CellData[];
+  yearStep: number;
   onUpdateCivilization?: (civ: Civilization) => void;
   onDeleteCivilization?: (civId: string) => void;
   onUpdateEvent?: (event: PeriodEvent) => void;
@@ -37,6 +40,8 @@ export function InspectorPanel({
   selectedCivilization,
   events,
   civilizations,
+  cellData,
+  yearStep,
   onUpdateCivilization,
   onDeleteCivilization,
   onUpdateEvent,
@@ -56,6 +61,7 @@ export function InspectorPanel({
   const [editedEventStartYear, setEditedEventStartYear] = useState("");
   const [editedEventEndYear, setEditedEventEndYear] = useState("");
   const [editedEventColor, setEditedEventColor] = useState("");
+  const [editedEventTextColor, setEditedEventTextColor] = useState("");
 
   // Reset edit mode when panel closes or civilization changes
   React.useEffect(() => {
@@ -76,6 +82,7 @@ export function InspectorPanel({
     setEditedEventStartYear(String(Math.abs(selectedEvent.startYear || 0)));
     setEditedEventEndYear(String(Math.abs(selectedEvent.endYear || 0)));
     setEditedEventColor(selectedEvent.color || "");
+    setEditedEventTextColor(selectedEvent.textColor || "");
     setEditMode(false);
   }, [selectedEvent]);
 
@@ -89,6 +96,13 @@ export function InspectorPanel({
 
   const getEventsForYear = (year: number) => {
     return events.filter((e) => year >= e.endYear && year <= e.startYear);
+  };
+
+  const getPhotosForYear = (year: number): CellPhoto[] => {
+    const tolerance = Math.max(0, yearStep - 1);
+    return cellData
+      .filter((cell) => Math.abs(cell.year - year) <= tolerance)
+      .flatMap((cell) => cell.photos || []);
   };
 
   const handleEditCivilization = () => {
@@ -202,6 +216,7 @@ export function InspectorPanel({
       startYear: -Math.abs(s),
       endYear: -Math.abs(e),
       color: editedEventColor.trim() || undefined,
+      textColor: editedEventTextColor.trim() || undefined,
     };
     onUpdateEvent(updated);
     setEditMode(false);
@@ -269,12 +284,23 @@ export function InspectorPanel({
               </View>
               {showColorPicker && (
                 <View style={styles.colorPickerContainer}>
+                  <Text style={styles.colorPickerTitle}>Arkaplan Rengi</Text>
                   <View style={styles.colorPalette}>
                     {CIVILIZATION_COLORS.map((color) => (
                       <TouchableOpacity
                         key={`evt-${color}`}
                         style={[styles.colorOption, { backgroundColor: color }, editedEventColor === color && styles.colorOptionSelected]}
                         onPress={() => setEditedEventColor(color)}
+                      />
+                    ))}
+                  </View>
+                  <Text style={styles.colorPickerTitle}>Yazi Rengi</Text>
+                  <View style={styles.colorPalette}>
+                    {["#ffffff", "#000000", "#f8fafc", "#fde047", "#ef4444", "#22c55e", "#38bdf8"].map((color) => (
+                      <TouchableOpacity
+                        key={`txt-${color}`}
+                        style={[styles.colorOption, { backgroundColor: color }, editedEventTextColor === color && styles.colorOptionSelected]}
+                        onPress={() => setEditedEventTextColor(color)}
                       />
                     ))}
                   </View>
@@ -560,6 +586,7 @@ export function InspectorPanel({
 
     if (selectedYear !== null) {
       const yearEvents = getEventsForYear(selectedYear);
+      const yearPhotos = getPhotosForYear(selectedYear);
       return (
         <View style={styles.content}>
           <View style={styles.header}>
@@ -590,6 +617,29 @@ export function InspectorPanel({
               </View>
             ) : (
               <Text style={styles.noEventsText}>No major events recorded for this year.</Text>
+            )}
+          </View>
+
+          <View style={styles.divider} />
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Photos in this Range</Text>
+            {yearPhotos.length > 0 ? (
+              <View style={styles.yearPhotosGrid}>
+                {yearPhotos.slice(0, 12).map((photo) => (
+                  <View key={photo.id} style={styles.yearPhotoCard}>
+                    <Image source={{ uri: photo.uri }} style={styles.yearPhotoImage} />
+                    {!!photo.caption?.trim() && (
+                      <Text style={styles.yearPhotoCaption} numberOfLines={2}>
+                        {photo.caption}
+                      </Text>
+                    )}
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.noEventsText}>
+                Bu yıl aralığında fotoğraf bulunmuyor.
+              </Text>
             )}
           </View>
         </View>
@@ -836,6 +886,31 @@ const styles = StyleSheet.create({
     color: "#94a3b8",
     fontSize: 14,
     fontStyle: "italic",
+  },
+  yearPhotosGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  yearPhotoCard: {
+    width: 120,
+    backgroundColor: "#111827",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#334155",
+    overflow: "hidden",
+  },
+  yearPhotoImage: {
+    width: "100%",
+    height: 84,
+    resizeMode: "cover",
+  },
+  yearPhotoCaption: {
+    color: "#cbd5e1",
+    fontSize: 11,
+    lineHeight: 14,
+    paddingHorizontal: 6,
+    paddingVertical: 5,
   },
   colorPreview: {
     flex: 1,

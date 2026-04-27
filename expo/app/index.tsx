@@ -32,6 +32,8 @@ import {
   GripVertical,
   FileText,
   LogOut,
+  Undo,
+  Redo,
 } from "lucide-react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as XLSX from "xlsx";
@@ -670,6 +672,28 @@ ${report.topEvents.map(e => `• [${e.years}] ${e.title} | ${e.period} | ${e.civ
             </TouchableOpacity>
           )}
           <TouchableOpacity
+            style={[styles.iconBtn, !timelineCtx.canUndo && styles.iconBtnDisabled]}
+            onPress={() => {
+              timelineCtx.undo();
+              toast.success("Geri alındı");
+            }}
+            disabled={!timelineCtx.canUndo}
+            testID="undo-btn"
+          >
+            <Undo size={18} color={!timelineCtx.canUndo ? "#666" : "#fff"} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.iconBtn, !timelineCtx.canRedo && styles.iconBtnDisabled]}
+            onPress={() => {
+              timelineCtx.redo();
+              toast.success("İleri alındı");
+            }}
+            disabled={!timelineCtx.canRedo}
+            testID="redo-btn"
+          >
+            <Redo size={18} color={!timelineCtx.canRedo ? "#666" : "#fff"} />
+          </TouchableOpacity>
+          <TouchableOpacity
             style={styles.iconBtn}
             onPress={handleImportFile}
             testID="import-btn"
@@ -1181,6 +1205,8 @@ ${report.topEvents.map(e => `• [${e.years}] ${e.title} | ${e.period} | ${e.civ
         selectedCivilization={timelineCtx.selectedCivilization}
         events={timelineCtx.events}
         civilizations={timelineCtx.civilizations}
+        cellData={timelineCtx.cellData}
+        yearStep={settingsCtx.settings.yearStep}
         onUpdateCivilization={timelineCtx.updateCivilization}
         onDeleteCivilization={timelineCtx.deleteCivilization}
         onUpdateEvent={timelineCtx.updateEvent}
@@ -1253,6 +1279,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(201, 162, 39, 0.15)",
     borderWidth: 1,
     borderColor: "rgba(201, 162, 39, 0.4)",
+  },
+  iconBtnDisabled: {
+    opacity: 0.4,
   },
   iconBtnDone: {
     width: "auto",
