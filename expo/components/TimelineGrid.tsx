@@ -410,14 +410,28 @@ export function TimelineGrid({
                           {
                             key: ph.id,
                             draggable: true,
+                            onMouseDown: (e: any) => {
+                              // Parent Pressable'in mousedown preventDefault'unu engelle.
+                              // Aksi halde tarayici dragstart'i iptal ediyor.
+                              try { e.stopPropagation(); } catch {}
+                            },
+                            onMouseDownCapture: (e: any) => {
+                              try { e.stopPropagation(); } catch {}
+                            },
                             onDragStart: (e: any) => {
                               try {
+                                e.stopPropagation();
                                 setIsDragging(true);
                                 const data = JSON.stringify({ fromYear: year, fromCivId: civ.id, photoId: ph.id });
                                 e.dataTransfer.setData("application/x-cell-photo", data);
                                 e.dataTransfer.setData("text/plain", data);
                                 e.dataTransfer.effectAllowed = "move";
-                              } catch {}
+                                if (e.dataTransfer.setDragImage && e.currentTarget) {
+                                  try { e.dataTransfer.setDragImage(e.currentTarget, 20, 20); } catch {}
+                                }
+                              } catch (err) {
+                                console.error("dragstart err", err);
+                              }
                             },
                             onDragEnd: () => setIsDragging(false),
                             onMouseEnter: () => setHoveredPhotoId(ph.id),
