@@ -45,6 +45,8 @@ import { useSettings } from "../context/SettingsContext";
 import { TimelineGrid } from "../components/TimelineGrid";
 import { InspectorPanel } from "../components/InspectorPanel";
 import { CellEditor } from "../components/CellEditor";
+import { CivilizationDepo } from "../components/CivilizationDepo";
+import { FolderOpen } from "lucide-react-native";
 import {
   Civilization,
   PeriodEvent,
@@ -81,6 +83,7 @@ export default function TimelineScreen() {
   const [reorderMode, setReorderMode] = useState<boolean>(false);
   const [showScrollTop, setShowScrollTop] = useState<boolean>(false);
   const [showReportConfig, setShowReportConfig] = useState<boolean>(false);
+  const [depoCiv, setDepoCiv] = useState<Civilization | null>(null);
   const [reportStartYear, setReportStartYear] = useState<string>("");
   const [reportEndYear, setReportEndYear] = useState<string>("");
   const { width: viewportWidth } = useWindowDimensions();
@@ -875,6 +878,20 @@ ${report.topEvents.map(e => `• [${e.years}] ${e.title} | ${e.period} | ${e.civ
                 <Text style={styles.civHeaderRegion} numberOfLines={1}>
                   {civ.region}
                 </Text>
+                {!reorderMode && (
+                  <TouchableOpacity
+                    style={styles.civDepoBtn}
+                    onPress={(e) => {
+                      (e as any)?.stopPropagation?.();
+                      setDepoCiv(civ);
+                    }}
+                    hitSlop={6}
+                    testID={`civ-depo-${civ.id}`}
+                  >
+                    <FolderOpen size={11} color="#0b0e14" />
+                    <Text style={styles.civDepoBtnText}>Depo</Text>
+                  </TouchableOpacity>
+                )}
               </TouchableOpacity>
             ))}
             <TouchableOpacity
@@ -1212,6 +1229,12 @@ ${report.topEvents.map(e => `• [${e.years}] ${e.title} | ${e.period} | ${e.civ
         onUpdateEvent={timelineCtx.updateEvent}
       />
 
+      <CivilizationDepo
+        visible={!!depoCiv}
+        civilization={depoCiv}
+        onClose={() => setDepoCiv(null)}
+      />
+
       <CellEditor
         visible={cellEditorOpen}
         onClose={handleCloseCellEditor}
@@ -1425,6 +1448,22 @@ const styles = StyleSheet.create({
     backgroundColor: "#111827",
   },
   civHeaderSel: { backgroundColor: "rgba(201, 162, 39, 0.12)" },
+  civDepoBtn: {
+    marginTop: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: "#c9a227",
+  },
+  civDepoBtnText: {
+    color: "#0b0e14",
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
   civColorDot: {
     width: 8,
     height: 8,

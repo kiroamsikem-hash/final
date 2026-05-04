@@ -180,7 +180,43 @@ export function TimelineGrid({
   periodFilter,
   searchQuery,
 }: TimelineGridProps) {
-  const { removeCellPhoto, deleteEvent, clearCell } = useTimeline();
+  const { removeCellPhoto, deleteEvent, clearCell, moveCellPhoto } = useTimeline();
+  const civNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    civilizations.forEach((c) => m.set(c.id, c.name));
+    return m;
+  }, [civilizations]);
+  const [dropHover, setDropHover] = useState<string | null>(null);
+
+  const formatYearLabel = useCallback((y: number) => {
+    const a = Math.abs(y);
+    return y < 0 ? `M.Ö. ${a}` : `${a}`;
+  }, []);
+
+  const handlePhotoDrop = useCallback(
+    (
+      payload: { fromYear: number; fromCivId: string; photoId: string },
+      target: { toYear: number; toCivId: string }
+    ) => {
+      const { fromYear, fromCivId, photoId } = payload;
+      const { toYear, toCivId } = target;
+      if (fromYear === toYear && fromCivId === toCivId) return;
+      const fromName = civNameById.get(fromCivId) || fromCivId;
+      const toName = civNameById.get(toCivId) || toCivId;
+      const msg = `Fotoğrafı ${fromName} · ${formatYearLabel(fromYear)} hücresinden\n${toName} · ${formatYearLabel(toYear)} hücresine taşımak istediğinize emin misiniz?`;
+      if (Platform.OS === "web") {
+        if (typeof window !== "undefined" && window.confirm(msg)) {
+          moveCellPhoto(fromYear, fromCivId, toYear, toCivId, photoId);
+        }
+        return;
+      }
+      Alert.alert("Fotoğrafı Taşı", msg, [
+        { text: "Hayır", style: "cancel" },
+        { text: "Evet, Taşı", onPress: () => moveCellPhoto(fromYear, fromCivId, toYear, toCivId, photoId) },
+      ]);
+    },
+    [civNameById, formatYearLabel, moveCellPhoto]
+  );
   const { settings } = useSettings();
   const [hoveredPhotoId, setHoveredPhotoId] = useState<string | null>(null);
   const labelOnRight = settings.eventLabelDirection === "right";
@@ -287,6 +323,7 @@ export function TimelineGrid({
                   showGridLines && styles.cellBgBorder,
                   isRowSel && styles.rowHighlight,
                   isCellSel && { backgroundColor: `${civ.color}26` },
+                  dropHover === `${civ.id}-${year}` && styles.cellDropHover,
                 ]}
                 onPress={() => {
                   if (isCellSel) {
@@ -295,6 +332,31 @@ export function TimelineGrid({
                 }}
                 onLongPress={() => onCellSelect({ year, civilizationId: civ.id })}
                 delayLongPress={280}
+                {...(Platform.OS === "web"
+                  ? ({
+                      onDragOver: (e: any) => {
+                        e.preventDefault();
+                        try { e.dataTransfer.dropEffect = "move"; } catch {}
+                        setDropHover(`${civ.id}-${year}`);
+                      },
+                      onDragLeave: () => {
+                        setDropHover((prev) => (prev === `${civ.id}-${year}` ? null : prev));
+                      },
+                      onDrop: (e: any) => {
+                        e.preventDefault();
+                        setDropHover(null);
+                        try {
+                          const raw = e.dataTransfer.getData("application/x-cell-photo") || e.dataTransfer.getData("text/plain");
+                          if (!raw) return;
+                          const payload = JSON.parse(raw);
+                          if (!payload?.photoId || payload.fromCivId == null) return;
+                          handlePhotoDrop(payload, { toYear: year, toCivId: civ.id });
+                        } catch (err) {
+                          console.error("drop parse error", err);
+                        }
+                      },
+                    } as any)
+                  : {})}
               >
                 {isCellSel && (
                   <View style={styles.cellLabelTag} pointerEvents="none">
@@ -310,6 +372,19 @@ export function TimelineGrid({
                         style={[styles.photoTile, { width: photoSize, height: photoSize }]}
                         onHoverIn={() => setHoveredPhotoId(ph.id)}
                         onHoverOut={() => setHoveredPhotoId((prev) => (prev === ph.id ? null : prev))}
+                        {...(Platform.OS === "web"
+                          ? ({
+                              draggable: true,
+                              onDragStart: (e: any) => {
+                                try {
+                                  const data = JSON.stringify({ fromYear: year, fromCivId: civ.id, photoId: ph.id });
+                                  e.dataTransfer.setData("application/x-cell-photo", data);
+                                  e.dataTransfer.setData("text/plain", data);
+                                  e.dataTransfer.effectAllowed = "move";
+                                } catch {}
+                              },
+                            } as any)
+                          : {})}
                         onPress={() => {
                           if (!ph.caption?.trim()) return;
                           if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -473,6 +548,8 @@ export function TimelineGrid({
       hoveredPhotoId,
       labelOnRight,
       readableLabelFontSize,
+      dropHover,
+      handlePhotoDrop,
     ]
   );
 
@@ -502,6 +579,11 @@ const styles = StyleSheet.create({
   },
   rowHighlight: {
     backgroundColor: "rgba(201, 162, 39, 0.11)",
+  },
+  cellDropHover: {
+    backgroundColor: "rgba(34,197,94,0.18)",
+    borderWidth: 2,
+    borderColor: "#22c55e",
   },
   cellSelBorder: {
     position: "absolute",

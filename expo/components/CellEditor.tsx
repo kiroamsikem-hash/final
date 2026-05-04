@@ -29,6 +29,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { Cell, Civilization, PeriodEvent, CellPhoto } from "@/types";
 import { useTimeline } from "@/context/TimelineContext";
+import { useSettings } from "@/context/SettingsContext";
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -115,6 +116,7 @@ export function CellEditor({
   onAddEvent,
 }: CellEditorProps) {
   const timelineCtx = useTimeline();
+  const settingsCtx = useSettings();
   const [activeTab, setActiveTab] = useState<"events" | "photos" | "tags" | "notes" | "related" | "name">("events");
   const [newTag, setNewTag] = useState("");
   const [newNote, setNewNote] = useState("");
@@ -302,6 +304,34 @@ export function CellEditor({
   const formatYear = (year: number): string => {
     return `${Math.abs(year)} BC`;
   };
+
+  // Hücre koordinatını hesapla (A1, B2, C5 gibi)
+  const getCellCoordinate = useCallback((): string => {
+    if (!cell || !settingsCtx) return "";
+    
+    // Medeniyet index'ini bul (sütun harfi için)
+    const civIndex = civilizations.findIndex(c => c.id === cell.civilizationId);
+    if (civIndex === -1) return "";
+    
+    // Sütun harfini hesapla (A, B, C, ... Z, AA, AB, ...)
+    let column = "";
+    let n = civIndex;
+    while (n >= 0) {
+      column = String.fromCharCode(65 + (n % 26)) + column;
+      n = Math.floor(n / 26) - 1;
+    }
+    
+    // Satır numarasını hesapla (yıl listesindeki sıra)
+    try {
+      const yearsList = settingsCtx.getYearsList();
+      const rowIndex = yearsList.findIndex(y => y === cell.year);
+      const row = rowIndex !== -1 ? rowIndex + 1 : 1;
+      return `${column}${row}`;
+    } catch (error) {
+      console.warn("Error calculating cell coordinate:", error);
+      return `${column}?`;
+    }
+  }, [cell, civilizations, settingsCtx]);
 
   const handleAddTag = useCallback(() => {
     if (!cell || !newTag.trim()) return;
@@ -1228,7 +1258,15 @@ export function CellEditor({
                   style={[styles.civIndicator, { backgroundColor: civilization.color }]}
                 />
                 <Text style={styles.civName}>{civilization.name}</Text>
+                <View style={styles.cellCoordinateBadge}>
+                  <Text style={styles.cellCoordinateText}>{getCellCoordinate()}</Text>
+                </View>
               </View>
+              {cellData?.name && (
+                <View style={styles.headerMiddle}>
+                  <Text style={styles.cellNameText}>📍 {cellData.name}</Text>
+                </View>
+              )}
               <View style={styles.headerBottom}>
                 <MapPin size={14} color="#888" />
                 <Text style={styles.yearText}>{formatYear(cell.year)}</Text>
@@ -1359,6 +1397,29 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     color: "#f8fafc",
+  },
+  cellCoordinateBadge: {
+    backgroundColor: "#c9a227",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginLeft: 8,
+  },
+  cellCoordinateText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1a1a1a",
+    letterSpacing: 0.5,
+  },
+  headerMiddle: {
+    marginTop: 6,
+    marginBottom: 2,
+  },
+  cellNameText: {
+    fontSize: 14,
+    color: "#94a3b8",
+    fontWeight: "500",
+    fontStyle: "italic",
   },
   headerBottom: {
     flexDirection: "row",
