@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useState } from "react";
+import React, { useMemo, useCallback, useState, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -188,6 +188,31 @@ export function TimelineGrid({
   }, [civilizations]);
   const [dropHover, setDropHover] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  const gridRootRef = useRef<any>(null);
+  const [ghost, setGhost] = useState<{ x: number; y: number; uri: string } | null>(null);
+
+  const computeTargetFromPoint = useCallback(
+    (clientX: number, clientY: number): { civId: string; year: number } | null => {
+      const node = gridRootRef.current as HTMLElement | null;
+      if (!node || typeof node.getBoundingClientRect !== "function") return null;
+      const rect = node.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      if (x < 0 || y < 0 || x >= rect.width || y >= rect.height) return null;
+      const civIdx = Math.floor(x / cellWidth);
+      if (civIdx < 0 || civIdx >= civilizations.length) return null;
+      let rowIdx = -1;
+      for (let i = 0; i < rowTops.length; i += 1) {
+        if (y >= rowTops[i] && y < rowTops[i] + rowHeights[i]) {
+          rowIdx = i;
+          break;
+        }
+      }
+      if (rowIdx < 0) return null;
+      return { civId: civilizations[civIdx].id, year: years[rowIdx] };
+    },
+    [cellWidth, civilizations, rowHeights, rowTops, years]
+  );
 
   const formatYearLabel = useCallback((y: number) => {
     const a = Math.abs(y);
@@ -217,6 +242,62 @@ export function TimelineGrid({
       ]);
     },
     [civNameById, formatYearLabel, moveCellPhoto]
+  );
+
+  const startManualDrag = useCallback(
+    (
+      ev: { clientX: number; clientY: number },
+      photo: { id: string; uri: string },
+      year: number,
+      civId: string
+    ) => {
+      if (Platform.OS !== "web" || typeof window === "undefined") return;
+      const startX = ev.clientX;
+      const startY = ev.clientY;
+      let active = false;
+
+      const onMove = (e: PointerEvent) => {
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        if (!active) {
+          if (Math.hypot(dx, dy) < 6) return;
+          active = true;
+          setIsDragging(true);
+          try { document.body.style.cursor = "grabbing"; } catch {}
+        }
+        const t = computeTargetFromPoint(e.clientX, e.clientY);
+        setGhost({ x: e.clientX, y: e.clientY, uri: photo.uri });
+        if (t) setDropHover(`${t.civId}-${t.year}`);
+        else setDropHover(null);
+      };
+
+      const cleanup = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onUp);
+        try { document.body.style.cursor = ""; } catch {}
+        setGhost(null);
+        setIsDragging(false);
+        setDropHover(null);
+      };
+
+      const onUp = (e: PointerEvent) => {
+        const wasActive = active;
+        const t = computeTargetFromPoint(e.clientX, e.clientY);
+        cleanup();
+        if (!wasActive || !t) return;
+        if (t.civId === civId && t.year === year) return;
+        handlePhotoDrop(
+          { fromYear: year, fromCivId: civId, photoId: photo.id },
+          { toYear: t.year, toCivId: t.civId }
+        );
+      };
+
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onUp);
+    },
+    [computeTargetFromPoint, handlePhotoDrop]
   );
   const { settings } = useSettings();
   const [hoveredPhotoId, setHoveredPhotoId] = useState<string | null>(null);
@@ -334,44 +415,6 @@ export function TimelineGrid({
                 onLongPress={() => onCellSelect({ year, civilizationId: civ.id })}
                 delayLongPress={280}
               >
-                {Platform.OS === "web" && (
-                  React.createElement("div", {
-                    style: {
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      pointerEvents: isDragging ? "auto" : "none",
-                      zIndex: 30,
-                      background: dropHover === `${civ.id}-${year}` ? "rgba(34,197,94,0.18)" : "transparent",
-                      border: dropHover === `${civ.id}-${year}` ? "2px solid #22c55e" : "none",
-                      borderRadius: 4,
-                    },
-                    onDragOver: (e: any) => {
-                      e.preventDefault();
-                      try { e.dataTransfer.dropEffect = "move"; } catch {}
-                      setDropHover(`${civ.id}-${year}`);
-                    },
-                    onDragLeave: () => {
-                      setDropHover((prev) => (prev === `${civ.id}-${year}` ? null : prev));
-                    },
-                    onDrop: (e: any) => {
-                      e.preventDefault();
-                      setDropHover(null);
-                      setIsDragging(false);
-                      try {
-                        const raw = e.dataTransfer.getData("application/x-cell-photo") || e.dataTransfer.getData("text/plain");
-                        if (!raw) return;
-                        const payload = JSON.parse(raw);
-                        if (!payload?.photoId || payload.fromCivId == null) return;
-                        handlePhotoDrop(payload, { toYear: year, toCivId: civ.id });
-                      } catch (err) {
-                        console.error("drop parse error", err);
-                      }
-                    },
-                  })
-                )}
                 {isCellSel && (
                   <View style={styles.cellLabelTag} pointerEvents="none">
                     <Text style={styles.cellLabelText}>{cellLabel}</Text>
@@ -409,34 +452,27 @@ export function TimelineGrid({
                           "div",
                           {
                             key: ph.id,
-                            draggable: true,
+                            onPointerDown: (e: any) => {
+                              try { e.stopPropagation(); } catch {}
+                              try { e.preventDefault?.(); } catch {}
+                              startManualDrag(
+                                { clientX: e.clientX, clientY: e.clientY },
+                                { id: ph.id, uri: ph.uri },
+                                year,
+                                civ.id
+                              );
+                            },
                             onMouseDown: (e: any) => {
-                              // Parent Pressable'in mousedown preventDefault'unu engelle.
-                              // Aksi halde tarayici dragstart'i iptal ediyor.
                               try { e.stopPropagation(); } catch {}
                             },
                             onMouseDownCapture: (e: any) => {
                               try { e.stopPropagation(); } catch {}
                             },
-                            onDragStart: (e: any) => {
-                              try {
-                                e.stopPropagation();
-                                setIsDragging(true);
-                                const data = JSON.stringify({ fromYear: year, fromCivId: civ.id, photoId: ph.id });
-                                e.dataTransfer.setData("application/x-cell-photo", data);
-                                e.dataTransfer.setData("text/plain", data);
-                                e.dataTransfer.effectAllowed = "move";
-                                if (e.dataTransfer.setDragImage && e.currentTarget) {
-                                  try { e.dataTransfer.setDragImage(e.currentTarget, 20, 20); } catch {}
-                                }
-                              } catch (err) {
-                                console.error("dragstart err", err);
-                              }
-                            },
-                            onDragEnd: () => setIsDragging(false),
                             onMouseEnter: () => setHoveredPhotoId(ph.id),
                             onMouseLeave: () => setHoveredPhotoId((prev: any) => (prev === ph.id ? null : prev)),
-                            onClick: () => {
+                            onClick: (e: any) => {
+                              if (isDragging) return;
+                              try { e.stopPropagation(); } catch {}
                               if (!ph.caption?.trim()) return;
                               if (typeof window !== "undefined") window.alert(ph.caption);
                             },
@@ -610,12 +646,33 @@ export function TimelineGrid({
       dropHover,
       handlePhotoDrop,
       isDragging,
+      startManualDrag,
     ]
   );
 
   return (
-    <View style={[styles.root, { height: totalHeight }]}>
+    <View ref={gridRootRef as any} style={[styles.root, { height: totalHeight }]}>
       {civilizations.map(renderCivColumn)}
+      {Platform.OS === "web" && ghost
+        ? React.createElement("div", {
+            style: {
+              position: "fixed",
+              left: ghost.x + 12,
+              top: ghost.y + 12,
+              width: 80,
+              height: 80,
+              borderRadius: 8,
+              backgroundImage: `url(${ghost.uri})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              border: "2px solid #c9a227",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
+              pointerEvents: "none",
+              zIndex: 9999,
+              opacity: 0.92,
+            },
+          })
+        : null}
     </View>
   );
 }
