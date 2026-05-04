@@ -187,6 +187,7 @@ export function TimelineGrid({
     return m;
   }, [civilizations]);
   const [dropHover, setDropHover] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
 
   const formatYearLabel = useCallback((y: number) => {
     const a = Math.abs(y);
@@ -332,32 +333,45 @@ export function TimelineGrid({
                 }}
                 onLongPress={() => onCellSelect({ year, civilizationId: civ.id })}
                 delayLongPress={280}
-                {...(Platform.OS === "web"
-                  ? ({
-                      onDragOver: (e: any) => {
-                        e.preventDefault();
-                        try { e.dataTransfer.dropEffect = "move"; } catch {}
-                        setDropHover(`${civ.id}-${year}`);
-                      },
-                      onDragLeave: () => {
-                        setDropHover((prev) => (prev === `${civ.id}-${year}` ? null : prev));
-                      },
-                      onDrop: (e: any) => {
-                        e.preventDefault();
-                        setDropHover(null);
-                        try {
-                          const raw = e.dataTransfer.getData("application/x-cell-photo") || e.dataTransfer.getData("text/plain");
-                          if (!raw) return;
-                          const payload = JSON.parse(raw);
-                          if (!payload?.photoId || payload.fromCivId == null) return;
-                          handlePhotoDrop(payload, { toYear: year, toCivId: civ.id });
-                        } catch (err) {
-                          console.error("drop parse error", err);
-                        }
-                      },
-                    } as any)
-                  : {})}
               >
+                {Platform.OS === "web" && (
+                  React.createElement("div", {
+                    style: {
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      pointerEvents: isDragging ? "auto" : "none",
+                      zIndex: 30,
+                      background: dropHover === `${civ.id}-${year}` ? "rgba(34,197,94,0.18)" : "transparent",
+                      border: dropHover === `${civ.id}-${year}` ? "2px solid #22c55e" : "none",
+                      borderRadius: 4,
+                    },
+                    onDragOver: (e: any) => {
+                      e.preventDefault();
+                      try { e.dataTransfer.dropEffect = "move"; } catch {}
+                      setDropHover(`${civ.id}-${year}`);
+                    },
+                    onDragLeave: () => {
+                      setDropHover((prev) => (prev === `${civ.id}-${year}` ? null : prev));
+                    },
+                    onDrop: (e: any) => {
+                      e.preventDefault();
+                      setDropHover(null);
+                      setIsDragging(false);
+                      try {
+                        const raw = e.dataTransfer.getData("application/x-cell-photo") || e.dataTransfer.getData("text/plain");
+                        if (!raw) return;
+                        const payload = JSON.parse(raw);
+                        if (!payload?.photoId || payload.fromCivId == null) return;
+                        handlePhotoDrop(payload, { toYear: year, toCivId: civ.id });
+                      } catch (err) {
+                        console.error("drop parse error", err);
+                      }
+                    },
+                  })
+                )}
                 {isCellSel && (
                   <View style={styles.cellLabelTag} pointerEvents="none">
                     <Text style={styles.cellLabelText}>{cellLabel}</Text>
@@ -366,54 +380,85 @@ export function TimelineGrid({
 
                 {photos.length > 0 && (
                   <View style={[styles.photosInline, { top: 22, height: photosBlockHeight, gap }]} pointerEvents="box-none">
-                    {photos.map((ph) => (
-                      <Pressable
-                        key={ph.id}
-                        style={[styles.photoTile, { width: photoSize, height: photoSize }]}
-                        onHoverIn={() => setHoveredPhotoId(ph.id)}
-                        onHoverOut={() => setHoveredPhotoId((prev) => (prev === ph.id ? null : prev))}
-                        {...(Platform.OS === "web"
-                          ? ({
-                              draggable: true,
-                              onDragStart: (e: any) => {
-                                try {
-                                  const data = JSON.stringify({ fromYear: year, fromCivId: civ.id, photoId: ph.id });
-                                  e.dataTransfer.setData("application/x-cell-photo", data);
-                                  e.dataTransfer.setData("text/plain", data);
-                                  e.dataTransfer.effectAllowed = "move";
-                                } catch {}
-                              },
-                            } as any)
-                          : {})}
-                        onPress={() => {
-                          if (!ph.caption?.trim()) return;
-                          if (Platform.OS === "web" && typeof window !== "undefined") {
-                            window.alert(ph.caption);
-                            return;
-                          }
-                          Alert.alert("Fotograf Aciklamasi", ph.caption);
-                        }}
-                      >
-                        <Image source={{ uri: ph.uri }} style={styles.photoTileImg} />
-                        {!!ph.caption?.trim() && hoveredPhotoId === ph.id && (
-                          <View style={styles.photoCaptionOverlay}>
-                            <Text style={styles.photoCaptionText} numberOfLines={3}>
-                              {ph.caption}
-                            </Text>
-                          </View>
-                        )}
-                        {isCellSel && (
-                          <TouchableOpacity
-                            style={styles.photoRemove}
-                            onPress={() => confirmDelete("Fotoğraf Sil", "Bu fotoğrafı silmek istediğinize emin misiniz?", () => removeCellPhoto(year, civ.id, ph.id))}
-                            hitSlop={12}
-                            testID={`photo-remove-${civ.id}-${year}-${ph.id}`}
-                          >
-                            <X size={14} color="#fff" />
-                          </TouchableOpacity>
-                        )}
-                      </Pressable>
-                    ))}
+                    {photos.map((ph) => {
+                      const inner = (
+                        <>
+                          <Image source={{ uri: ph.uri }} style={styles.photoTileImg} />
+                          {!!ph.caption?.trim() && hoveredPhotoId === ph.id && (
+                            <View style={styles.photoCaptionOverlay}>
+                              <Text style={styles.photoCaptionText} numberOfLines={3}>
+                                {ph.caption}
+                              </Text>
+                            </View>
+                          )}
+                          {isCellSel && (
+                            <TouchableOpacity
+                              style={styles.photoRemove}
+                              onPress={() => confirmDelete("Fotoğraf Sil", "Bu fotoğrafı silmek istediğinize emin misiniz?", () => removeCellPhoto(year, civ.id, ph.id))}
+                              hitSlop={12}
+                              testID={`photo-remove-${civ.id}-${year}-${ph.id}`}
+                            >
+                              <X size={14} color="#fff" />
+                            </TouchableOpacity>
+                          )}
+                        </>
+                      );
+
+                      if (Platform.OS === "web") {
+                        return React.createElement(
+                          "div",
+                          {
+                            key: ph.id,
+                            draggable: true,
+                            onDragStart: (e: any) => {
+                              try {
+                                setIsDragging(true);
+                                const data = JSON.stringify({ fromYear: year, fromCivId: civ.id, photoId: ph.id });
+                                e.dataTransfer.setData("application/x-cell-photo", data);
+                                e.dataTransfer.setData("text/plain", data);
+                                e.dataTransfer.effectAllowed = "move";
+                              } catch {}
+                            },
+                            onDragEnd: () => setIsDragging(false),
+                            onMouseEnter: () => setHoveredPhotoId(ph.id),
+                            onMouseLeave: () => setHoveredPhotoId((prev: any) => (prev === ph.id ? null : prev)),
+                            onClick: () => {
+                              if (!ph.caption?.trim()) return;
+                              if (typeof window !== "undefined") window.alert(ph.caption);
+                            },
+                            "data-testid": `photo-${civ.id}-${year}-${ph.id}`,
+                            style: {
+                              width: photoSize,
+                              height: photoSize,
+                              borderRadius: 6,
+                              overflow: "hidden",
+                              backgroundColor: "#0f172a",
+                              border: "1px solid rgba(255,255,255,0.1)",
+                              position: "relative",
+                              cursor: "grab",
+                              userSelect: "none",
+                              WebkitUserSelect: "none",
+                            },
+                          },
+                          inner
+                        );
+                      }
+
+                      return (
+                        <Pressable
+                          key={ph.id}
+                          style={[styles.photoTile, { width: photoSize, height: photoSize }]}
+                          onHoverIn={() => setHoveredPhotoId(ph.id)}
+                          onHoverOut={() => setHoveredPhotoId((prev) => (prev === ph.id ? null : prev))}
+                          onPress={() => {
+                            if (!ph.caption?.trim()) return;
+                            Alert.alert("Fotograf Aciklamasi", ph.caption);
+                          }}
+                        >
+                          {inner}
+                        </Pressable>
+                      );
+                    })}
                   </View>
                 )}
 
@@ -550,6 +595,7 @@ export function TimelineGrid({
       readableLabelFontSize,
       dropHover,
       handlePhotoDrop,
+      isDragging,
     ]
   );
 

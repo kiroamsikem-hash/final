@@ -45,7 +45,6 @@ import { useSettings } from "../context/SettingsContext";
 import { TimelineGrid } from "../components/TimelineGrid";
 import { InspectorPanel } from "../components/InspectorPanel";
 import { CellEditor } from "../components/CellEditor";
-import { CivilizationDepo } from "../components/CivilizationDepo";
 import { FolderOpen } from "lucide-react-native";
 import {
   Civilization,
@@ -83,7 +82,7 @@ export default function TimelineScreen() {
   const [reorderMode, setReorderMode] = useState<boolean>(false);
   const [showScrollTop, setShowScrollTop] = useState<boolean>(false);
   const [showReportConfig, setShowReportConfig] = useState<boolean>(false);
-  const [depoCiv, setDepoCiv] = useState<Civilization | null>(null);
+  const [hoveredCivId, setHoveredCivId] = useState<string | null>(null);
   const [reportStartYear, setReportStartYear] = useState<string>("");
   const [reportEndYear, setReportEndYear] = useState<string>("");
   const { width: viewportWidth } = useWindowDimensions();
@@ -844,10 +843,19 @@ ${report.topEvents.map(e => `• [${e.years}] ${e.title} | ${e.period} | ${e.civ
                 ]}
                 onPress={() => {
                   if (reorderMode) return;
+                  router.push(`/storage/${encodeURIComponent(civ.name)}` as any);
+                }}
+                onLongPress={() => {
+                  if (reorderMode) return;
                   handleSelectCivilization(civ);
                 }}
-                onLongPress={() => setReorderMode(true)}
-                delayLongPress={320}
+                delayLongPress={420}
+                {...(Platform.OS === "web"
+                  ? ({
+                      onMouseEnter: () => setHoveredCivId(civ.id),
+                      onMouseLeave: () => setHoveredCivId((prev: any) => (prev === civ.id ? null : prev)),
+                    } as any)
+                  : {})}
               >
                 {reorderMode ? (
                   <View style={styles.reorderRow}>
@@ -878,19 +886,11 @@ ${report.topEvents.map(e => `• [${e.years}] ${e.title} | ${e.period} | ${e.civ
                 <Text style={styles.civHeaderRegion} numberOfLines={1}>
                   {civ.region}
                 </Text>
-                {!reorderMode && (
-                  <TouchableOpacity
-                    style={styles.civDepoBtn}
-                    onPress={(e) => {
-                      (e as any)?.stopPropagation?.();
-                      setDepoCiv(civ);
-                    }}
-                    hitSlop={6}
-                    testID={`civ-depo-${civ.id}`}
-                  >
+                {!reorderMode && hoveredCivId === civ.id && (
+                  <View style={styles.civDepoBtn} pointerEvents="none">
                     <FolderOpen size={11} color="#0b0e14" />
                     <Text style={styles.civDepoBtnText}>Depo</Text>
-                  </TouchableOpacity>
+                  </View>
                 )}
               </TouchableOpacity>
             ))}
@@ -1227,12 +1227,6 @@ ${report.topEvents.map(e => `• [${e.years}] ${e.title} | ${e.period} | ${e.civ
         onUpdateCivilization={timelineCtx.updateCivilization}
         onDeleteCivilization={timelineCtx.deleteCivilization}
         onUpdateEvent={timelineCtx.updateEvent}
-      />
-
-      <CivilizationDepo
-        visible={!!depoCiv}
-        civilization={depoCiv}
-        onClose={() => setDepoCiv(null)}
       />
 
       <CellEditor
