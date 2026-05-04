@@ -11,13 +11,14 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack } from "expo-router";
-import { ChevronLeft, RotateCcw } from "lucide-react-native";
+import { ChevronLeft, RotateCcw, Mail } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 
 import { useSettings } from "../context/SettingsContext";
 import { TimelineSettings } from "../types";
 import { saveLanguage } from "../lib/i18n";
 import { showToast } from "../components/Toast";
+import { sendBackupEmailFromClient } from "../lib/backup";
 
 // Unique identifier: wa-chron-settings-2024
 
@@ -48,6 +49,28 @@ export default function SettingsPage() {
   const { settings, updateSettings, resetSettings } = useSettings();
   const { t, i18n } = useTranslation();
   const { width: viewportWidth } = useWindowDimensions();
+  const [backupBusy, setBackupBusy] = React.useState<boolean>(false);
+
+  const onSendBackup = useCallback(async () => {
+    if (backupBusy) return;
+    setBackupBusy(true);
+    try {
+      showToast("Yedek hazırlanıyor...", "info");
+      const r = await sendBackupEmailFromClient();
+      if (r.ok) {
+        showToast(
+          `Yedek gönderildi${r.to ? " → " + r.to : ""} (${r.attachedArticles ?? 0}/${r.totalArticles ?? 0} depo dosyası eklendi)`,
+          "success"
+        );
+      } else {
+        showToast(`Yedek başarısız: ${r.message}`, "error");
+      }
+    } catch (err: any) {
+      showToast(`Hata: ${err?.message || err}`, "error");
+    } finally {
+      setBackupBusy(false);
+    }
+  }, [backupBusy]);
   const isWideWeb = Platform.OS === "web" && viewportWidth >= 1200;
 
   const changeLanguage = useCallback(
@@ -275,6 +298,24 @@ export default function SettingsPage() {
             step={1}
             onChange={(v) => updateSettings({ eventLabelFontSize: v })}
           />
+        </Section>
+
+        <Section title="Yedekleme (E-posta)" wide={isWideWeb}>
+          <Text style={styles.backupHint}>
+            Tüm zaman çizelgesi verisi (medeniyetler, olaylar, hücre verileri, fotoğraflar ve depo dosyaları) e-posta ile gönderilir.
+            Sunucu ayrıca her gün otomatik yedek atar.
+          </Text>
+          <TouchableOpacity
+            style={[styles.backupBtn, backupBusy && styles.backupBtnBusy]}
+            onPress={onSendBackup}
+            disabled={backupBusy}
+            testID="backup-send-btn"
+          >
+            <Mail size={18} color={backupBusy ? "#94a3b8" : "#0b0e14"} />
+            <Text style={[styles.backupBtnText, backupBusy && styles.backupBtnTextBusy]}>
+              {backupBusy ? "Gönderiliyor..." : "E-posta ile Yedek Gönder"}
+            </Text>
+          </TouchableOpacity>
         </Section>
 
         <View style={styles.footer} />
@@ -607,5 +648,32 @@ const styles = StyleSheet.create({
   },
   footer: {
     height: 40,
+  },
+  backupHint: {
+    color: "#94a3b8",
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  backupBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: "#c9a227",
+  },
+  backupBtnBusy: {
+    backgroundColor: "#374151",
+  },
+  backupBtnText: {
+    color: "#0b0e14",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  backupBtnTextBusy: {
+    color: "#94a3b8",
   },
 });

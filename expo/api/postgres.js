@@ -362,3 +362,4 @@ async function handleImportSql(req, res, data) {
 
 module.exports = handler;
 module.exports.default = handler;
+module.exports.pool = pool;

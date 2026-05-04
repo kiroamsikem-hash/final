@@ -65,6 +65,34 @@ export const articleStorage = {
     return isWeb();
   },
 
+  async listAll(): Promise<ArticleMeta[]> {
+    if (!isWeb()) return [];
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readonly");
+      const req = tx.objectStore(STORE).getAll();
+      req.onsuccess = () => {
+        const result = (req.result as ArticleRecord[]).map(toMeta);
+        resolve(result);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  },
+
+  async exportAllWithBlobs(): Promise<{ meta: ArticleMeta; blob: Blob }[]> {
+    if (!isWeb()) return [];
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readonly");
+      const req = tx.objectStore(STORE).getAll();
+      req.onsuccess = () => {
+        const recs = (req.result as ArticleRecord[]) || [];
+        resolve(recs.map((r) => ({ meta: toMeta(r), blob: r.blob })));
+      };
+      req.onerror = () => reject(req.error);
+    });
+  },
+
   async listByCivilization(civilizationId: string): Promise<ArticleMeta[]> {
     if (!isWeb()) return [];
     const db = await openDB();
