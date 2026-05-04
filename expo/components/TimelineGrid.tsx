@@ -180,7 +180,7 @@ export function TimelineGrid({
   periodFilter,
   searchQuery,
 }: TimelineGridProps) {
-  const { removeCellPhoto, deleteEvent, clearCell, moveCellPhoto } = useTimeline();
+  const { removeCellPhoto, deleteEvent, clearCell, moveCellPhoto, copyCellPhoto } = useTimeline();
   const civNameById = useMemo(() => {
     const m = new Map<string, string>();
     civilizations.forEach((c) => m.set(c.id, c.name));
@@ -229,20 +229,22 @@ export function TimelineGrid({
       if (fromYear === toYear && fromCivId === toCivId) return;
       const fromName = civNameById.get(fromCivId) || fromCivId;
       const toName = civNameById.get(toCivId) || toCivId;
-      const msg = `Fotoğrafı ${fromName} · ${formatYearLabel(fromYear)} hücresinden\n${toName} · ${formatYearLabel(toYear)} hücresine taşımak istediğinize emin misiniz?`;
+      const msg = `Fotoğrafın kopyasını ${fromName} · ${formatYearLabel(fromYear)} hücresinden\n${toName} · ${formatYearLabel(toYear)} hücresine eklemek istediğinize emin misiniz?\n(Orijinal yerinde kalacak)`;
       if (Platform.OS === "web") {
         if (typeof window !== "undefined" && window.confirm(msg)) {
-          moveCellPhoto(fromYear, fromCivId, toYear, toCivId, photoId);
+          copyCellPhoto(fromYear, fromCivId, toYear, toCivId, photoId);
         }
         return;
       }
-      Alert.alert("Fotoğrafı Taşı", msg, [
+      Alert.alert("Fotoğrafı Kopyala", msg, [
         { text: "Hayır", style: "cancel" },
-        { text: "Evet, Taşı", onPress: () => moveCellPhoto(fromYear, fromCivId, toYear, toCivId, photoId) },
+        { text: "Evet, Kopyala", onPress: () => copyCellPhoto(fromYear, fromCivId, toYear, toCivId, photoId) },
       ]);
     },
-    [civNameById, formatYearLabel, moveCellPhoto]
+    [civNameById, formatYearLabel, copyCellPhoto]
   );
+  // note: moveCellPhoto kept in context for other callers but no longer used here (copy-on-drop semantics)
+  void moveCellPhoto;
 
   const startManualDrag = useCallback(
     (

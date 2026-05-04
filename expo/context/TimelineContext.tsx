@@ -33,6 +33,7 @@ interface TimelineContextType {
   addCellPhoto: (year: number, civilizationId: string, photo: CellPhoto) => void;
   removeCellPhoto: (year: number, civilizationId: string, photoId: string) => void;
   moveCellPhoto: (fromYear: number, fromCivId: string, toYear: number, toCivId: string, photoId: string) => void;
+  copyCellPhoto: (fromYear: number, fromCivId: string, toYear: number, toCivId: string, photoId: string) => void;
   updateCellPhotoCaption: (year: number, civilizationId: string, photoId: string, caption: string) => void;
   addCellTag: (year: number, civilizationId: string, tag: string) => void;
   removeCellTag: (year: number, civilizationId: string, tag: string) => void;
@@ -312,6 +313,46 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
             civilizationId: toCivId,
             events: [],
             photos: [photo],
+            tags: [],
+          };
+          updated.push(toCell);
+        }
+        saveSingleCellData(toCell);
+        return updated;
+      });
+    },
+    [saveSingleCellData]
+  );
+
+  const copyCellPhoto = useCallback(
+    (fromYear: number, fromCivId: string, toYear: number, toCivId: string, photoId: string) => {
+      if (fromYear === toYear && fromCivId === toCivId) return;
+      setCellData((prev) => {
+        const fromIdx = prev.findIndex((c) => c.year === fromYear && c.civilizationId === fromCivId);
+        if (fromIdx < 0) return prev;
+        const srcPhoto = prev[fromIdx].photos.find((p) => p.id === photoId);
+        if (!srcPhoto) return prev;
+        const newPhoto: CellPhoto = {
+          ...srcPhoto,
+          id: `${photoId}-copy-${Date.now().toString(36)}`,
+        };
+
+        const updated = [...prev];
+        const toIdx = updated.findIndex((c) => c.year === toYear && c.civilizationId === toCivId);
+        let toCell: CellData;
+        if (toIdx >= 0) {
+          toCell = {
+            ...updated[toIdx],
+            photos: [...(updated[toIdx].photos || []), newPhoto],
+          };
+          updated[toIdx] = toCell;
+        } else {
+          toCell = {
+            id: `${toYear}-${toCivId}`,
+            year: toYear,
+            civilizationId: toCivId,
+            events: [],
+            photos: [newPhoto],
             tags: [],
           };
           updated.push(toCell);
@@ -619,6 +660,7 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
         addCellPhoto,
         removeCellPhoto,
         moveCellPhoto,
+        copyCellPhoto,
         updateCellPhotoCaption,
         addCellTag,
         removeCellTag,
