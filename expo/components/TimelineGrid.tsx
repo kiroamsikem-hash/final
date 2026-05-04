@@ -13,6 +13,7 @@ import { FileText, X, Trash2 } from "lucide-react-native";
 import { Civilization, PeriodEvent, Cell, CellData } from "@/types";
 import { useTimeline } from "@/context/TimelineContext";
 import { useSettings } from "@/context/SettingsContext";
+import { PhotoLightbox, LightboxPhoto } from "./PhotoLightbox";
 
 function civIndexToLetter(idx: number): string {
   let s = "";
@@ -190,6 +191,10 @@ export function TimelineGrid({
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const gridRootRef = useRef<any>(null);
   const [ghost, setGhost] = useState<{ x: number; y: number; uri: string } | null>(null);
+  const [hoverPreview, setHoverPreview] = useState<
+    { uri: string; caption?: string; x: number; y: number; civName: string; yearLabel: string; civColor: string } | null
+  >(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const computeTargetFromPoint = useCallback(
     (clientX: number, clientY: number): { civId: string; year: number } | null => {
@@ -218,6 +223,46 @@ export function TimelineGrid({
     const a = Math.abs(y);
     return y < 0 ? `M.Ö. ${a}` : `${a}`;
   }, []);
+
+  const allPhotosFlat = useMemo<(LightboxPhoto & { civId: string; year: number; photoId: string })[]>(() => {
+    const out: (LightboxPhoto & { civId: string; year: number; photoId: string })[] = [];
+    const civMetaById = new Map<string, { name: string; color: string; order: number }>();
+    civilizations.forEach((c, idx) => civMetaById.set(c.id, { name: c.name, color: c.color, order: idx }));
+    const sortedCells = [...cellData].sort((a, b) => {
+      const oa = civMetaById.get(a.civilizationId)?.order ?? 999;
+      const ob = civMetaById.get(b.civilizationId)?.order ?? 999;
+      if (oa !== ob) return oa - ob;
+      return a.year - b.year;
+    });
+    for (const c of sortedCells) {
+      const meta = civMetaById.get(c.civilizationId);
+      if (!meta) continue;
+      for (const p of c.photos || []) {
+        out.push({
+          key: `${c.civilizationId}|${c.year}|${p.id}`,
+          uri: p.uri,
+          caption: p.caption,
+          civName: meta.name,
+          civColor: meta.color,
+          year: c.year,
+          yearLabel: formatYearLabel(c.year),
+          civId: c.civilizationId,
+          photoId: p.id,
+        });
+      }
+    }
+    return out;
+  }, [cellData, civilizations, formatYearLabel]);
+
+  const openLightboxFor = useCallback(
+    (civId: string, year: number, photoId: string) => {
+      const idx = allPhotosFlat.findIndex(
+        (p) => p.civId === civId && p.year === year && p.photoId === photoId
+      );
+      if (idx >= 0) setLightboxIndex(idx);
+    },
+    [allPhotosFlat]
+  );
 
   const handlePhotoDrop = useCallback(
     (
@@ -470,13 +515,35 @@ export function TimelineGrid({
                             onMouseDownCapture: (e: any) => {
                               try { e.stopPropagation(); } catch {}
                             },
-                            onMouseEnter: () => setHoveredPhotoId(ph.id),
-                            onMouseLeave: () => setHoveredPhotoId((prev: any) => (prev === ph.id ? null : prev)),
+                            onMouseEnter: (e: any) => {
+                              setHoveredPhotoId(ph.id);
+                              if (isDragging) return;
+                              const meta = civilizations.find((c) => c.id === civ.id);
+                              setHoverPreview({
+                                uri: ph.uri,
+                                caption: ph.caption,
+                                x: e.clientX,
+                                y: e.clientY,
+                                civName: meta?.name || civ.id,
+                                yearLabel: formatYearLabel(year),
+                                civColor: meta?.color || "#c9a227",
+                              });
+                            },
+                            onMouseMove: (e: any) => {
+                              if (isDragging) return;
+                              setHoverPreview((prev) =>
+                                prev ? { ...prev, x: e.clientX, y: e.clientY } : prev
+                              );
+                            },
+                            onMouseLeave: () => {
+                              setHoveredPhotoId((prev: any) => (prev === ph.id ? null : prev));
+                              setHoverPreview(null);
+                            },
                             onClick: (e: any) => {
                               if (isDragging) return;
                               try { e.stopPropagation(); } catch {}
-                              if (!ph.caption?.trim()) return;
-                              if (typeof window !== "undefined") window.alert(ph.caption);
+                              setHoverPreview(null);
+                              openLightboxFor(civ.id, year, ph.id);
                             },
                             "data-testid": `photo-${civ.id}-${year}-${ph.id}`,
                             style: {
@@ -502,10 +569,7 @@ export function TimelineGrid({
                           style={[styles.photoTile, { width: photoSize, height: photoSize }]}
                           onHoverIn={() => setHoveredPhotoId(ph.id)}
                           onHoverOut={() => setHoveredPhotoId((prev) => (prev === ph.id ? null : prev))}
-                          onPress={() => {
-                            if (!ph.caption?.trim()) return;
-                            Alert.alert("Fotograf Aciklamasi", ph.caption);
-                          }}
+                          onPress={() => openLightboxFor(civ.id, year, ph.id)}
                         >
                           {inner}
                         </Pressable>
@@ -652,9 +716,88 @@ export function TimelineGrid({
     ]
   );
 
+  const renderHoverPreview = () => {
+    if (Platform.OS !== "web" || !hoverPreview || isDragging) return null;
+    const previewSize = 320;
+    const viewportW = typeof window !== "undefined" ? window.innerWidth : 1200;
+    const viewportH = typeof window !== "undefined" ? window.innerHeight : 800;
+    let left = hoverPreview.x + 20;
+    let top = hoverPreview.y + 20;
+    if (left + previewSize > viewportW - 10) left = hoverPreview.x - previewSize - 20;
+    if (top + previewSize + 80 > viewportH - 10) top = Math.max(10, viewportH - previewSize - 90);
+    if (top < 10) top = 10;
+    return React.createElement(
+      "div",
+      {
+        style: {
+          position: "fixed",
+          left,
+          top,
+          width: previewSize,
+          zIndex: 9998,
+          pointerEvents: "none",
+          borderRadius: 10,
+          overflow: "hidden",
+          backgroundColor: "#0b0e14",
+          border: `2px solid ${hoverPreview.civColor}`,
+          boxShadow: "0 12px 32px rgba(0,0,0,0.55)",
+        },
+      },
+      React.createElement("img", {
+        src: hoverPreview.uri,
+        style: {
+          display: "block",
+          width: previewSize,
+          height: previewSize,
+          objectFit: "cover",
+          pointerEvents: "none",
+        } as any,
+      }),
+      React.createElement(
+        "div",
+        {
+          style: {
+            padding: "8px 10px",
+            fontSize: 12,
+            color: "#e5e7eb",
+            backgroundColor: "rgba(17,24,39,0.95)",
+            borderTop: "1px solid rgba(255,255,255,0.08)",
+          },
+        },
+        React.createElement(
+          "div",
+          {
+            style: {
+              fontWeight: 800,
+              color: "#fff",
+              marginBottom: hoverPreview.caption?.trim() ? 4 : 0,
+            },
+          },
+          `${hoverPreview.civName} · ${hoverPreview.yearLabel}`
+        ),
+        hoverPreview.caption?.trim()
+          ? React.createElement(
+              "div",
+              { style: { color: "#cbd5e1", lineHeight: "18px" } },
+              hoverPreview.caption
+            )
+          : null
+      )
+    );
+  };
+
   return (
     <View ref={gridRootRef as any} style={[styles.root, { height: totalHeight }]}>
       {civilizations.map(renderCivColumn)}
+      {renderHoverPreview()}
+      <PhotoLightbox
+        photos={allPhotosFlat}
+        currentIndex={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+        onNavigate={(delta) =>
+          setLightboxIndex((prev) => (prev === null ? prev : prev + delta))
+        }
+      />
       {Platform.OS === "web" && ghost
         ? React.createElement("div", {
             style: {
